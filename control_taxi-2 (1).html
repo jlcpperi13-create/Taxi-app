@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Taxímetro · Cierre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #15181A;
+  --surface: #1F2427;
+  --surface-2: #262B2E;
+  --surface-3: #2E3437;
+  --amber: #FFB020;
+  --amber-dim: #7A5410;
+  --amber-glow: rgba(255,176,32,0.25);
+  --teal: #3FA796;
+  --coral: #E4574C;
+  --paper: #ECE7DA;
+  --ink: #EDEDE7;
+  --muted: #9AA0A0;
+  --hair: #33393C;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:'Work Sans',sans-serif; min-height:100vh;}
+h1,h2,h3,.display{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.02em; text-transform:uppercase;}
+.mono{font-family:'JetBrains Mono',monospace; font-variant-numeric: tabular-nums;}
+button{font-family:inherit; cursor:pointer;}
+input,select{font-family:inherit;}
+
+/* ---------- app shell ---------- */
+.app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); position:relative;}
+
+/* ---------- meter panel (signature element) ---------- */
+.meter{
+  background: linear-gradient(180deg, #191D1F, #121516);
+  border-bottom: 1px solid var(--hair);
+  padding: 18px 18px 16px;
+  position: sticky; top:0; z-index: 20;
+}
+.meter-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+.meter-brand{font-size:13px; letter-spacing:0.18em; color:var(--amber); display:flex; align-items:center; gap:8px;}
+.meter-brand .dot{width:7px; height:7px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px 2px var(--amber-glow); animation: pulse 2.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+.meter-date{font-size:12px; color:var(--muted);}
+.meter-readout{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+.meter-cell{background:#0F1213; border:1px solid var(--hair); border-radius:6px; padding:8px 6px; text-align:center;}
+.meter-cell .label{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:3px;}
+.meter-cell .value{font-size:19px; color:var(--amber); text-shadow:0 0 10px var(--amber-glow); line-height:1.1;}
+.meter-cell.teal .value{color:var(--teal); text-shadow:0 0 10px rgba(63,167,150,0.25);}
+@media (prefers-reduced-motion: reduce){ .dot{animation:none;} }
+
+/* ---------- content ---------- */
+.content{flex:1; padding: 16px 16px 90px; overflow-y:auto;}
+.section-title{font-size:22px; color:var(--ink); margin: 4px 0 14px; display:flex; align-items:center; justify-content:space-between;}
+.section-title .sub{font-size:12px; color:var(--muted); text-transform:none; font-family:'Work Sans'; letter-spacing:0; font-weight:400;}
+
+.card{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:16px; margin-bottom:12px;}
+.card + .card{margin-top:12px;}
+
+.field{margin-bottom:12px;}
+.field label{display:block; font-size:11.5px; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.05em;}
+.field input, .field select{
+  width:100%; background:var(--surface-2); border:1px solid var(--hair); color:var(--ink);
+  padding:10px 11px; border-radius:8px; font-size:15px; outline:none;
+}
+.field input:focus, .field select:focus{border-color:var(--amber); box-shadow:0 0 0 3px var(--amber-glow);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
+
+.btn{border:none; border-radius:9px; padding:12px 16px; font-size:14px; font-weight:600; width:100%;}
+.btn-primary{background:var(--amber); color:#1A1300;}
+.btn-primary:active{background:#e6a01c;}
+.btn-ghost{background:transparent; border:1px solid var(--hair); color:var(--ink);}
+.btn-danger{background:transparent; border:1px solid var(--coral); color:var(--coral);}
+.btn-row{display:flex; gap:8px;}
+.btn-row .btn{width:auto; flex:1;}
+
+.pct-toggle{display:flex; background:var(--surface-2); border-radius:8px; padding:3px; gap:3px;}
+.pct-toggle button{flex:1; background:transparent; border:none; color:var(--muted); padding:8px; border-radius:6px; font-size:13px;}
+.pct-toggle button.active{background:var(--amber); color:#1A1300; font-weight:600;}
+
+.entry{border-bottom:1px solid var(--hair); padding:12px 0;}
+.entry:last-child{border-bottom:none;}
+.entry-top{display:flex; justify-content:space-between; align-items:baseline;}
+.entry-date{font-size:15px; font-weight:600;}
+.entry-amount{font-family:'JetBrains Mono',monospace; color:var(--amber); font-size:15px;}
+.entry-meta{font-size:12px; color:var(--muted); margin-top:3px;}
+.entry-tags{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
+.tag{font-size:10.5px; padding:2px 8px; border-radius:20px; border:1px solid var(--hair); color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;}
+.tag.pag{color:var(--teal); border-color:rgba(63,167,150,0.4);}
+.tag.pend{color:var(--amber); border-color:rgba(255,176,32,0.4);}
+.tag.anulado{color:var(--coral); border-color:rgba(228,87,76,0.4);}
+
+.empty{text-align:center; padding:40px 20px; color:var(--muted);}
+.empty .display{font-size:20px; color:var(--ink); margin-bottom:6px;}
+
+.month-header{display:flex; justify-content:space-between; align-items:center; margin:22px 0 10px;}
+.month-header:first-child{margin-top:0;}
+.month-name{font-size:17px;}
+.month-total{font-family:'JetBrains Mono',monospace; color:var(--amber); font-size:14px;}
+
+.bar-row{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+.bar-label{width:64px; font-size:11px; color:var(--muted); flex-shrink:0;}
+.bar-track{flex:1; background:var(--surface-2); border-radius:5px; height:16px; overflow:hidden;}
+.bar-fill{height:100%; background:linear-gradient(90deg, var(--amber-dim), var(--amber)); border-radius:5px;}
+.bar-value{width:66px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:12px; flex-shrink:0;}
+
+/* ---------- bottom nav ---------- */
+.nav{position:fixed; bottom:0; left:0; right:0; z-index:30; display:flex; justify-content:center;}
+.nav-inner{max-width:520px; width:100%; background:#0F1213; border-top:1px solid var(--hair); display:flex; padding: 6px 10px calc(6px + env(safe-area-inset-bottom));}
+.nav-btn{flex:1; background:transparent; border:none; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 4px; border-radius:10px;}
+.nav-btn.active{color:var(--amber);}
+.nav-btn .icon{width:20px; height:20px;}
+.nav-btn .lbl{font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-family:'Barlow Condensed'; font-weight:600;}
+
+.toast{position:fixed; bottom:78px; left:50%; transform:translateX(-50%); background:var(--surface-3); border:1px solid var(--hair); color:var(--ink); padding:9px 16px; border-radius:20px; font-size:13px; z-index:50; opacity:0; transition:opacity 0.25s;}
+.toast.show{opacity:1;}
+
+.fab-add{position:sticky; bottom:0;}
+.driver-pill{display:flex; gap:6px; margin-bottom:14px;}
+.driver-pill button{flex:1; background:var(--surface-2); border:1px solid var(--hair); color:var(--muted); padding:7px; border-radius:8px; font-size:12.5px;}
+.driver-pill button.active{border-color:var(--amber); color:var(--amber);}
+
+.notice{background:rgba(255,176,32,0.08); border:1px solid var(--amber-dim); border-radius:10px; padding:10px 12px; font-size:12px; color:var(--muted); margin-bottom:14px; line-height:1.4;}
+.subhead{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px; font-weight:600;}
+.loading{text-align:center; padding:30px; color:var(--muted); font-size:13px;}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+const LS_PREFIX = 'taxi-cierre-app:';
+function lsGet(key){
+  const raw = localStorage.getItem(LS_PREFIX + key);
+  return raw === null ? null : { value: raw };
+}
+function lsSet(key, value){
+  localStorage.setItem(LS_PREFIX + key, value);
+  return { value };
+}
+
+const CAT_DIARIO = [
+  {id:'gasolina', label:'Gasolina'},
+  {id:'autopista', label:'Autopista'},
+  {id:'autopista_tarjeta', label:'Autopista (tarjeta)'},
+  {id:'tarjeta', label:'Tarjeta / TPV'},
+  {id:'otros', label:'Otros'},
+];
+const CAT_PERIODICO = [
+  {id:'seguro', label:'Seguro'},
+  {id:'itv', label:'ITV'},
+  {id:'mantenimiento', label:'Mantenimiento'},
+  {id:'seguridad_social', label:'Seguridad Social'},
+  {id:'cuota_reta', label:'Cuota RETA'},
+  {id:'cuota_gremial', label:'Cuota gremial'},
+  {id:'amortizacion', label:'Amortización'},
+  {id:'salario', label:'Salario'},
+  {id:'otros_fijos', label:'Otros fijos'},
+];
+const catLabel = (list, id) => (list.find(c=>c.id===id) || {}).label || id;
+
+let state = {
+  tab: 'cierre',
+  cierres: [],
+  servicios: [],
+  gastos: [],
+  mantenimientos: [],
+  tiposMantenimiento: ['Cambio de aceite','Neumáticos','ITV','Frenos','Filtros','Batería','Revisión general','Otros'],
+  driver: 'Chofer 1',
+  drivers: ['Chofer 1','Chofer 2'],
+  pctEmpresa: 65,
+  loaded: false,
+  editingCierreId: null,
+  editingServicioId: null,
+  editingGastoId: null,
+  editingMantenimientoId: null,
+  gastoTipo: 'diario',
+  gastoPrefillFecha: null,
+  skipPrefill: false,
+  mesActual: null,
+};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const fmt = (n) => (isFinite(n) ? n : 0).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2});
+const round2 = (n) => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
+const todayISO = () => new Date().toISOString().slice(0,10);
+const monthKey = (iso) => iso.slice(0,7);
+const monthLabel = (key) => {
+  const [y,m] = key.split('-');
+  const names = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${names[parseInt(m,10)-1]} ${y}`;
+};
+
+async function loadData(){
+  try{
+    const c = lsGet('cierres-data');
+    state.cierres = c ? JSON.parse(c.value) : [];
+  }catch(e){ state.cierres = []; }
+  try{
+    const s = lsGet('servicios-data');
+    state.servicios = s ? JSON.parse(s.value) : [];
+  }catch(e){ state.servicios = []; }
+  try{
+    const g = lsGet('gastos-data');
+    state.gastos = g ? JSON.parse(g.value) : [];
+  }catch(e){ state.gastos = []; }
+  try{
+    const mant = lsGet('mantenimiento-data');
+    state.mantenimientos = mant ? JSON.parse(mant.value) : [];
+  }catch(e){ state.mantenimientos = []; }
+  try{
+    const cfg = lsGet('config-data');
+    if(cfg){
+      const parsed = JSON.parse(cfg.value);
+      if(Array.isArray(parsed.drivers) && parsed.drivers.length === 2) state.drivers = parsed.drivers;
+      if(parsed.driver) state.driver = parsed.driver;
+      if(parsed.pctEmpresa) state.pctEmpresa = parsed.pctEmpresa;
+      if(Array.isArray(parsed.tiposMantenimiento) && parsed.tiposMantenimiento.length) state.tiposMantenimiento = parsed.tiposMantenimiento;
+    }
+  }catch(e){ /* keep defaults */ }
+  if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
+
+  const migration = migrateLegacyExpenses();
+  state.loaded = true;
+  render();
+  if(migration.changed) await saveCierres();
+  if(migration.gastosChanged) await saveGastos();
+}
+
+async function saveCierres(){
+  try{ lsSet('cierres-data', JSON.stringify(state.cierres)); }
+  catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
+}
+async function saveServicios(){
+  try{ lsSet('servicios-data', JSON.stringify(state.servicios)); }
+  catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
+}
+async function saveGastos(){
+  try{ lsSet('gastos-data', JSON.stringify(state.gastos)); }
+  catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
+}
+async function saveMantenimientos(){
+  try{ lsSet('mantenimiento-data', JSON.stringify(state.mantenimientos)); }
+  catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
+}
+async function saveConfig(){
+  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, tiposMantenimiento: state.tiposMantenimiento })); }
+  catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
+}
+
+/* migrate old lump-sum expense fields (from before the Gastos tab existed) into individual entries */
+function migrateLegacyExpenses(){
+  const map = {gasolina:'gasolina', autopista:'autopista', gastTarj:'tarjeta', otrosGast:'otros'};
+  let changed = false, gastosChanged = false;
+  state.cierres.forEach(c => {
+    const legacyFields = Object.keys(map);
+    const hasLegacy = legacyFields.some(f => c[f] !== undefined && c[f] !== '' && c[f] !== null && +c[f] !== 0);
+    if(hasLegacy){
+      legacyFields.forEach(f => {
+        const val = +c[f];
+        if(val){
+          state.gastos.push({ id: uid(), tipo:'diario', fecha: c.fecha, categoria: map[f], importe: val, nota: 'Migrado del cierre diario', chofer: c.chofer });
+          gastosChanged = true;
+        }
+      });
+      legacyFields.forEach(f => delete c[f]);
+      changed = true;
+    }
+  });
+  return { changed, gastosChanged };
+}
+
+let toastTimer;
+function showToast(msg){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toast'; t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+/* ---------- derived ---------- */
+function summarizeGastos(items){
+  const sum = cat => items.filter(g => g.categoria === cat).reduce((s,g)=> s + (+g.importe||0), 0);
+  const gasolina = sum('gasolina');
+  const autopistaEfectivo = sum('autopista');
+  const autopistaTarjeta = sum('autopista_tarjeta');
+  const autopista = autopistaEfectivo + autopistaTarjeta;
+  const tarjeta = sum('tarjeta');
+  const otros = sum('otros');
+  return { gasolina, autopista, autopistaEfectivo, autopistaTarjeta, tarjeta, otros, total: gasolina + tarjeta + otros, items };
+}
+
+/* Servicios/gastos "del turno abierto" de un chofer: solo lo que aún está vivo (sin archivar en ningún
+   cierre) para esa fecha+chofer. Al cerrar el turno esto vuelve a quedar a cero automáticamente. */
+function serviciosAbiertos(fecha, chofer){
+  return state.servicios.filter(s => s.fecha === fecha && s.chofer === chofer);
+}
+function gastosAbiertos(fecha, chofer){
+  return state.gastos.filter(g => g.tipo === 'diario' && g.fecha === fecha && g.chofer === chofer);
+}
+
+/* Servicios/gastos que corresponden a UN cierre concreto: sus propios archivados + lo que siga
+   vivo (sin archivar) de esa fecha+chofer, por si se añadió algo nuevo antes de volver a guardar. */
+function serviciosDeCierre(d){
+  const propios = Array.isArray(d.serviciosArchivados) ? d.serviciosArchivados : [];
+  return [...propios, ...serviciosAbiertos(d.fecha, d.chofer)];
+}
+function gastosDeCierre(d){
+  const propios = Array.isArray(d.gastosArchivados) ? d.gastosArchivados : [];
+  return [...propios, ...gastosAbiertos(d.fecha, d.chofer)];
+}
+
+/* servicios "vivos" (aún en la lista general) + servicios ya archivados dentro de un cierre de esa fecha/mes
+   — usado para informes globales (mensual/anual), sin distinguir por chofer */
+function serviciosDeFecha(fecha){
+  const archivados = state.cierres
+    .filter(c => c.fecha === fecha && Array.isArray(c.serviciosArchivados))
+    .flatMap(c => c.serviciosArchivados);
+  const vivos = state.servicios.filter(s => s.fecha === fecha);
+  return [...archivados, ...vivos];
+}
+function serviciosDeMes(mes){
+  const archivados = state.cierres
+    .filter(c => monthKey(c.fecha) === mes && Array.isArray(c.serviciosArchivados))
+    .flatMap(c => c.serviciosArchivados);
+  const vivos = state.servicios.filter(s => monthKey(s.fecha) === mes);
+  return [...archivados, ...vivos];
+}
+function todosLosServicios(){
+  const archivados = state.cierres.flatMap(c => Array.isArray(c.serviciosArchivados) ? c.serviciosArchivados : []);
+  return [...archivados, ...state.servicios];
+}
+
+function cierreCalc(d){
+  const facturado = round2(+d.facturado || 0);
+  const kmInicio = +d.kmInicio || 0;
+  const kmFin = +d.kmFin || 0;
+  const serviciosDia = serviciosDeCierre(d).filter(s => s.estado !== 'anulado');
+  const conTarjeta = s => s.pago === 'tarjeta' || s.pago === 'tpv' || s.pago === 'transf';
+  const cardServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.importe||0), 0));
+  const propinas = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.propina||0), 0));
+  const gastos = summarizeGastos(gastosDeCierre(d));
+  const gastosEfectivo = round2(gastos.gasolina + gastos.otros + gastos.autopistaTarjeta);
+  const efectivo = round2(facturado - cardServicios - gastosEfectivo);
+  const kmJornada = Math.max(0, kmFin - kmInicio);
+  const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
+  const pct = (+d.pctEmpresa || state.pctEmpresa) / 100;
+  const importeEmpresa = round2(facturado * pct);
+  const choferBase = round2(facturado * (1 - pct));
+  const importeChofer = round2(choferBase + propinas);
+  const efectivoEmpresa = round2(efectivo - importeChofer + gastos.autopista);
+  const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta);
+  return { facturado, cardServicios, tarjetaBoxTotal, propinas, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
+}
+
+/* Contador del turno EN CURSO (aún no cerrado) del chofer activo. Al pulsar "Cerrar turno" todo lo
+   que suma aquí queda archivado dentro del cierre y este contador vuelve a cero automáticamente,
+   tanto si sigue el mismo chofer como si entra el otro. */
+function todayMeter(chofer){
+  chofer = chofer || state.driver;
+  const dateStr = todayISO();
+  const draft = { fecha: dateStr, chofer };
+  const facturado = round2(serviciosDeCierre(draft).filter(s => s.estado !== 'anulado').reduce((s,x)=> s + (+x.importe||0), 0));
+  const calc = cierreCalc({ ...draft, facturado });
+  return { ...calc, gastos: calc.totalGastos };
+}
+
+/* ---------- render root ---------- */
+function render(){
+  const app = document.getElementById('app');
+  if(!state.loaded){
+    app.innerHTML = `<div class="loading">Cargando datos del cierre…</div>`;
+    return;
+  }
+  const m = todayMeter();
+  app.innerHTML = `
+    <div class="meter">
+      <div class="meter-top">
+        <div class="meter-brand"><span class="dot"></span>TAXÍMETRO · CIERRE</div>
+        <div class="meter-date">${new Date().toLocaleDateString('es-ES',{weekday:'short', day:'numeric', month:'short'})}</div>
+      </div>
+      <div class="meter-readout">
+        <div class="meter-cell"><div class="label">Hoy facturado</div><div class="value mono">€${fmt(m.facturado)}</div></div>
+        <div class="meter-cell teal"><div class="label">Efectivo</div><div class="value mono">€${fmt(m.efectivo)}</div></div>
+        <div class="meter-cell"><div class="label">Gastos</div><div class="value mono">€${fmt(m.gastos)}</div></div>
+      </div>
+      <div class="meter-cell teal" style="margin-top:10px;">
+        <div class="label">Efectivo de empresa</div>
+        <div class="value mono" style="font-size:22px;">€${fmt(m.efectivoEmpresa)}</div>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+    <div class="nav">
+      <div class="nav-inner">
+        ${navBtn('servicios','Servicios', icon('list'))}
+        ${navBtn('cierre','Cierre', icon('meter'))}
+        ${navBtn('gastos','Gastos', icon('wallet'))}
+        ${navBtn('mantenimiento','Manten.', icon('wrench'))}
+        ${navBtn('mensual','Mensual', icon('calendar'))}
+        ${navBtn('anual','Anual', icon('chart'))}
+        ${navBtn('ajustes','Ajustes', icon('settings'))}
+      </div>
+    </div>
+  `;
+  renderContent();
+}
+
+function navBtn(id, label, svg){
+  return `<button class="nav-btn ${state.tab===id?'active':''}" onclick="setTab('${id}')">${svg}<span class="lbl">${label}</span></button>`;
+}
+function icon(name){
+  const icons = {
+    meter: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="8"/><path d="M12 13l3-3M12 5v2M4.5 8.5l1.4 1.4M19.5 8.5l-1.4 1.4"/></svg>',
+    list: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+    chart: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
+    wallet: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 14h2.5"/></svg>',
+    wrench: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.6 2.6-2-2z"/></svg>',
+    calendar: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    settings: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
+  };
+  return icons[name];
+}
+function setTab(id){ state.tab = id; state.editingCierreId = null; state.editingServicioId = null; state.editingGastoId = null; state.editingMantenimientoId = null; render(); }
+
+/* ---------- CIERRE TAB ---------- */
+function renderContent(){
+  const c = document.getElementById('content');
+  if(state.tab === 'cierre') return renderCierreTab(c);
+  if(state.tab === 'gastos') return renderGastosTab(c);
+  if(state.tab === 'servicios') return renderServiciosTab(c);
+  if(state.tab === 'mantenimiento') return renderMantenimientoTab(c);
+  if(state.tab === 'mensual') return renderMensualTab(c);
+  if(state.tab === 'anual') return renderAnualTab(c);
+  if(state.tab === 'ajustes') return renderAjustesTab(c);
+}
+
+function driverPillHTML(){
+  return `<div class="driver-pill">
+    ${state.drivers.map(d => `<button class="${state.driver===d?'active':''}" onclick="setDriver('${d}')">${d}</button>`).join('')}
+  </div>`;
+}
+function setDriver(d){ state.driver = d; saveConfig(); render(); }
+
+function renderCierreTab(c){
+  const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
+  const d = editing || { fecha: todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: state.pctEmpresa };
+  if(!editing && d.fecha === todayISO() && !state.skipPrefill){
+    const hoyFacturado = round2(todayMeter().facturado);
+    if(hoyFacturado > 0) d.facturado = hoyFacturado;
+  }
+  state.skipPrefill = false;
+  const calc = cierreCalc(d);
+
+  c.innerHTML = `
+    ${!editing ? '<div class="notice">Datos guardados solo en este navegador/dispositivo. Si cambias de móvil o borras datos de navegación, se pierden — usa "Copia de seguridad" en Ajustes para exportarlos.</div>' : ''}
+    <div class="section-title">${editing ? 'Editar cierre' : 'Nuevo cierre'}<span class="sub">${state.cierres.length} días registrados</span></div>
+    ${driverPillHTML()}
+
+    ${!editing ? `<button class="btn btn-primary" style="margin-bottom:4px;" onclick="closeShiftNow()">⏱ Cerrar turno ahora</button>
+    <div style="text-align:center; font-size:11px; color:var(--muted); margin:0 0 16px;">usa la fecha y hora de este momento</div>` : ''}
+
+    <div class="card">
+      <div class="subhead">Datos del día</div>
+      <input type="hidden" id="f-chofer" value="${d.chofer}">
+      <div class="row2 field">
+        <div><label>Fecha</label><input type="date" id="f-fecha" value="${d.fecha}" onchange="liveCalc()"></div>
+        <div><label>Clientes</label><input type="number" id="f-clientes" value="${d.clientes}" placeholder="0"></div>
+      </div>
+      <div class="field"><label>Facturado total (€)</label><input type="number" step="0.01" id="f-facturado" value="${d.facturado}" placeholder="0.00" oninput="liveCalc()"></div>
+      <div class="row2 field">
+        <div><label>Km inicio</label><input type="number" id="f-kmInicio" value="${d.kmInicio}" placeholder="0" oninput="liveCalc()"></div>
+        <div><label>Km fin</label><input type="number" id="f-kmFin" value="${d.kmFin}" placeholder="0" oninput="liveCalc()"></div>
+      </div>
+      <div class="row2" style="margin-top:2px;">
+        <div class="meter-cell"><div class="label">Km recorridos</div><div class="value mono" id="calc-km" style="font-size:16px;">${fmt(calc.kmJornada)}</div></div>
+        <div class="meter-cell"><div class="label">€/km</div><div class="value mono" id="calc-euros-km" style="font-size:16px;">€${fmt(calc.eurosPorKm)}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Reparto empresa / chofer</div>
+      <div class="pct-toggle" style="margin-bottom:12px;">
+        ${[50,65,70,100].map(p => `<button class="${(+d.pctEmpresa===p)?'active':''}" onclick="setPct(${p})">${p===100?'100%':p+'/'+(100-p)}</button>`).join('')}
+      </div>
+      <div class="row2">
+        <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" id="calc-empresa" style="font-size:14px;">€${fmt(calc.importeEmpresa)}</div></div>
+        <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" id="calc-chofer">€${fmt(calc.importeChofer)}</div></div>
+      </div>
+      ${calc.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" id="calc-propinas" style="font-size:14px;">€${fmt(calc.propinas)}</div></div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="subhead">Resultado</div>
+      <div class="row2">
+        <div class="meter-cell teal"><div class="label">Efectivo</div><div class="value mono" id="calc-efectivo" style="font-size:20px;">€${fmt(calc.efectivo)}</div></div>
+        <div class="meter-cell"><div class="label">Tarjeta/TPV/Transf.</div><div class="value mono" id="calc-tarjeta" style="font-size:14px;">−€${fmt(calc.tarjetaBoxTotal)}</div></div>
+      </div>
+      <div class="meter-cell teal" style="margin-top:10px;">
+        <div class="label">Efectivo de empresa</div>
+        <div class="value mono" id="calc-efectivo-empresa" style="font-size:20px;">€${fmt(calc.efectivoEmpresa)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Gastos</div>
+      <div class="row2">
+        <div class="meter-cell teal"><div class="label">Gastos del día</div><div class="value mono" id="calc-gastos" style="font-size:14px;">€${fmt(calc.totalGastos)}</div></div>
+        <div class="meter-cell"><div class="label">Gasolina</div><div class="value mono" id="calc-gastos-gasolina" style="font-size:14px;">€${fmt(calc.gastosDetalle.gasolina)}</div></div>
+      </div>
+      <div class="row2" style="margin-top:10px;">
+        <div class="meter-cell"><div class="label">Gastos tarjeta</div><div class="value mono" id="calc-gastos-tarjeta" style="font-size:14px;">€${fmt(calc.gastosDetalle.tarjeta)}</div></div>
+        <div class="meter-cell"><div class="label">Otros gastos</div><div class="value mono" id="calc-gastos-otros" style="font-size:14px;">€${fmt(calc.gastosDetalle.otros)}</div></div>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:10px; font-size:13px;" id="btn-goto-gastos" onclick="gotoGastosFor('${d.fecha}')">+ Anotar gasto de este día</button>
+    </div>
+
+    ${editing && Array.isArray(editing.serviciosArchivados) && editing.serviciosArchivados.length ? `
+    <div class="card">
+      <div class="subhead">Servicios de este cierre (${editing.serviciosArchivados.length})</div>
+      <div class="notice" style="margin-bottom:10px;">Estos servicios quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Servicios.</div>
+      ${editing.serviciosArchivados.map(archivedServicioRowHTML).join('')}
+    </div>` : ''}
+
+    <div class="btn-row">
+      ${editing ? `<button class="btn btn-danger" onclick="deleteCierre('${editing.id}')">Eliminar</button>` : ''}
+      <button class="btn btn-primary" onclick="saveCierre(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Registrar cierre'}</button>
+    </div>
+    ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingCierreId=null; render();">Cancelar</button>` : ''}
+
+    <div class="section-title" style="margin-top:24px;">Historial</div>
+    <div class="card" style="padding:4px 16px;">
+      ${state.cierres.length === 0 ? emptyHTML('Sin cierres todavía', 'Registra el primer día arriba.') :
+        [...state.cierres].sort((a,b)=> b.fecha.localeCompare(a.fecha)).map(cierreRowHTML).join('')}
+    </div>
+  `;
+}
+
+function gotoGastosFor(fecha){
+  state.gastoTipo = 'diario';
+  state.gastoPrefillFecha = fecha;
+  state.editingGastoId = null;
+  state.tab = 'gastos';
+  render();
+}
+
+function emptyHTML(title, sub){
+  return `<div class="empty"><div class="display">${title}</div><div>${sub}</div></div>`;
+}
+
+function cierreRowHTML(d){
+  const calc = cierreCalc(d);
+  const dt = new Date(d.fecha + 'T00:00:00');
+  const nServ = Array.isArray(d.serviciosArchivados) ? d.serviciosArchivados.length : 0;
+  return `<div class="entry" onclick="editCierre('${d.id}')" style="cursor:pointer;">
+    <div class="entry-top">
+      <div class="entry-date">${dt.toLocaleDateString('es-ES',{day:'2-digit', month:'short'})}</div>
+      <div class="entry-amount">€${fmt(calc.facturado)}</div>
+    </div>
+    <div class="entry-meta">${d.chofer || '—'}${d.horaCierre ? ' · ' + d.horaCierre : ''} · efectivo €${fmt(calc.efectivo)} · gastos €${fmt(calc.totalGastos)}${nServ ? ` · ${nServ} servicio${nServ===1?'':'s'} archivado${nServ===1?'':'s'}` : ''}</div>
+  </div>`;
+}
+
+function archivedServicioRowHTML(s){
+  const dt = new Date(s.fecha + 'T00:00:00');
+  const propina = +s.propina || 0;
+  return `<div class="entry">
+    <div class="entry-top">
+      <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
+      <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
+    </div>
+    <div class="entry-meta">${[s.origen,s.destino].filter(Boolean).join(' → ') || 'Sin ruta'} ${s.taxi ? '· taxi '+s.taxi : ''}</div>
+    <div class="entry-tags">
+      <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
+      <span class="tag">${s.pago}</span>
+      ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function setPct(p){
+  state.pctEmpresa = p;
+  const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
+  if(editing) editing.pctEmpresa = p;
+  saveConfig();
+  render();
+}
+
+function liveCalc(){
+  const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
+  const d = {
+    fecha: document.getElementById('f-fecha').value || todayISO(),
+    chofer: document.getElementById('f-chofer').value,
+    facturado: document.getElementById('f-facturado').value,
+    kmInicio: document.getElementById('f-kmInicio').value,
+    kmFin: document.getElementById('f-kmFin').value,
+    pctEmpresa: state.pctEmpresa,
+    serviciosArchivados: editing ? editing.serviciosArchivados : undefined,
+    gastosArchivados: editing ? editing.gastosArchivados : undefined,
+  };
+  const calc = cierreCalc(d);
+  document.getElementById('calc-efectivo').textContent = `€${fmt(calc.efectivo)}`;
+  document.getElementById('calc-tarjeta').textContent = `−€${fmt(calc.tarjetaBoxTotal)}`;
+  document.getElementById('calc-efectivo-empresa').textContent = `€${fmt(calc.efectivoEmpresa)}`;
+  document.getElementById('calc-km').textContent = `${fmt(calc.kmJornada)}`;
+  document.getElementById('calc-euros-km').textContent = `€${fmt(calc.eurosPorKm)}`;
+  document.getElementById('calc-gastos').textContent = `€${fmt(calc.totalGastos)}`;
+  document.getElementById('calc-gastos-gasolina').textContent = `€${fmt(calc.gastosDetalle.gasolina)}`;
+  document.getElementById('calc-gastos-tarjeta').textContent = `€${fmt(calc.gastosDetalle.tarjeta)}`;
+  document.getElementById('calc-gastos-otros').textContent = `€${fmt(calc.gastosDetalle.otros)}`;
+  document.getElementById('calc-empresa').textContent = `€${fmt(calc.importeEmpresa)}`;
+  document.getElementById('calc-chofer').textContent = `€${fmt(calc.importeChofer)}`;
+  const propinasEl = document.getElementById('calc-propinas');
+  if(propinasEl) propinasEl.textContent = `€${fmt(calc.propinas)}`;
+  const btn = document.getElementById('btn-goto-gastos');
+  if(btn) btn.setAttribute('onclick', `gotoGastosFor('${d.fecha}')`);
+}
+
+function editCierre(id){ state.editingCierreId = id; state.tab = 'cierre'; render(); window.scrollTo(0,0); }
+
+async function closeShiftNow(){
+  document.getElementById('f-fecha').value = todayISO();
+  await saveCierre(null, true);
+}
+
+async function saveCierre(id, stampNow){
+  const d = {
+    id: id || uid(),
+    fecha: document.getElementById('f-fecha').value || todayISO(),
+    chofer: document.getElementById('f-chofer').value || state.driver,
+    clientes: document.getElementById('f-clientes').value,
+    facturado: round2(document.getElementById('f-facturado').value),
+    kmInicio: document.getElementById('f-kmInicio').value,
+    kmFin: document.getElementById('f-kmFin').value,
+    pctEmpresa: state.pctEmpresa,
+  };
+  if(stampNow || !id){
+    d.horaCierre = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  } else {
+    const prev = state.cierres.find(x=>x.id===id);
+    if(prev && prev.horaCierre) d.horaCierre = prev.horaCierre;
+  }
+
+  /* Archivar dentro del cierre los servicios y gastos de ESE turno (fecha + chofer) y quitarlos
+     de las listas generales, para que el contador del turno en curso vuelva a cero */
+  const prevCierre = id ? state.cierres.find(x=>x.id===id) : null;
+  const prevServiciosArchivados = (prevCierre && prevCierre.serviciosArchivados) || [];
+  const prevGastosArchivados = (prevCierre && prevCierre.gastosArchivados) || [];
+  const nuevosServicios = state.servicios.filter(s => s.fecha === d.fecha && s.chofer === d.chofer);
+  const nuevosGastos = state.gastos.filter(g => g.tipo === 'diario' && g.fecha === d.fecha && g.chofer === d.chofer);
+  d.serviciosArchivados = [...prevServiciosArchivados, ...nuevosServicios];
+  d.gastosArchivados = [...prevGastosArchivados, ...nuevosGastos];
+  state.servicios = state.servicios.filter(s => !(s.fecha === d.fecha && s.chofer === d.chofer));
+  state.gastos = state.gastos.filter(g => !(g.tipo === 'diario' && g.fecha === d.fecha && g.chofer === d.chofer));
+
+  const wasNew = !id;
+  if(id){
+    const idx = state.cierres.findIndex(x=>x.id===id);
+    state.cierres[idx] = d;
+  } else {
+    state.cierres.push(d);
+  }
+  state.editingCierreId = null;
+  if(wasNew) state.skipPrefill = true;
+  await saveCierres();
+  await saveServicios();
+  await saveGastos();
+  const partes = [];
+  if(nuevosServicios.length) partes.push(`${nuevosServicios.length} servicio(s)`);
+  if(nuevosGastos.length) partes.push(`${nuevosGastos.length} gasto(s)`);
+  showToast(partes.length ? `Cierre guardado · ${partes.join(' y ')} archivado(s)` : 'Cierre guardado');
+  render();
+}
+
+async function deleteCierre(id){
+  const cierre = state.cierres.find(x=>x.id===id);
+  const serviciosRestaurados = (cierre && Array.isArray(cierre.serviciosArchivados)) ? cierre.serviciosArchivados : [];
+  const gastosRestaurados = (cierre && Array.isArray(cierre.gastosArchivados)) ? cierre.gastosArchivados : [];
+  if(serviciosRestaurados.length){
+    state.servicios = [...state.servicios, ...serviciosRestaurados];
+    await saveServicios();
+  }
+  if(gastosRestaurados.length){
+    state.gastos = [...state.gastos, ...gastosRestaurados];
+    await saveGastos();
+  }
+  state.cierres = state.cierres.filter(x=>x.id!==id);
+  state.editingCierreId = null;
+  await saveCierres();
+  const partes = [];
+  if(serviciosRestaurados.length) partes.push(`${serviciosRestaurados.length} servicio(s)`);
+  if(gastosRestaurados.length) partes.push(`${gastosRestaurados.length} gasto(s)`);
+  showToast(partes.length ? `Cierre eliminado · ${partes.join(' y ')} restaurado(s)` : 'Cierre eliminado');
+  render();
+}
+
+/* ---------- GASTOS TAB ---------- */
+function renderGastosTab(c){
+  const editing = state.editingGastoId ? state.gastos.find(x=>x.id===state.editingGastoId) : null;
+  const tipo = editing ? editing.tipo : state.gastoTipo;
+  const cats = tipo === 'diario' ? CAT_DIARIO : CAT_PERIODICO;
+  const prefillFecha = state.gastoPrefillFecha || todayISO();
+  const g = editing || { fecha: prefillFecha, categoria: cats[0].id, importe: '', nota: '' };
+  const list = state.gastos.filter(x => x.tipo === tipo);
+
+  let bodyHTML;
+  if(tipo === 'diario'){
+    const grouped = {};
+    [...list].sort((a,b)=> b.fecha.localeCompare(a.fecha)).forEach(x => (grouped[x.fecha] = grouped[x.fecha] || []).push(x));
+    const dates = Object.keys(grouped);
+    bodyHTML = dates.length === 0 ? `<div class="card">${emptyHTML('Sin gastos diarios','Los que anotes aquí se suman al cierre de esa fecha.')}</div>` :
+      dates.map(fe => {
+        const dt = new Date(fe + 'T00:00:00');
+        const total = grouped[fe].reduce((s,x)=>s+(+x.importe||0),0);
+        return `
+        <div class="month-header">
+          <div class="month-name display">${dt.toLocaleDateString('es-ES',{day:'2-digit', month:'long'})}</div>
+          <div class="month-total mono">€${fmt(total)}</div>
+        </div>
+        <div class="card" style="padding:4px 16px;">
+          ${grouped[fe].map(x => gastoRowHTML(x, CAT_DIARIO)).join('')}
+        </div>`;
+      }).join('');
+  } else {
+    const grouped = {};
+    [...list].sort((a,b)=> b.fecha.localeCompare(a.fecha)).forEach(x => { const k = monthKey(x.fecha); (grouped[k] = grouped[k] || []).push(x); });
+    const months = Object.keys(grouped);
+    bodyHTML = months.length === 0 ? `<div class="card">${emptyHTML('Sin gastos periódicos','Seguro, ITV, mantenimiento, cuotas, salario…')}</div>` :
+      months.map(mk => {
+        const total = grouped[mk].reduce((s,x)=>s+(+x.importe||0),0);
+        return `
+        <div class="month-header">
+          <div class="month-name display">${monthLabel(mk)}</div>
+          <div class="month-total mono">€${fmt(total)}</div>
+        </div>
+        <div class="card" style="padding:4px 16px;">
+          ${grouped[mk].map(x => gastoRowHTML(x, CAT_PERIODICO)).join('')}
+        </div>`;
+      }).join('');
+  }
+
+  c.innerHTML = `
+    <div class="section-title">${editing ? 'Editar gasto' : 'Nuevo gasto'}<span class="sub">${state.gastos.length} anotados</span></div>
+    ${driverPillHTML()}
+    <div class="pct-toggle" style="margin-bottom:14px;">
+      <button class="${tipo==='diario'?'active':''}" ${editing ? '' : `onclick="setGastoTipo('diario')"`}>Diario</button>
+      <button class="${tipo==='periodico'?'active':''}" ${editing ? '' : `onclick="setGastoTipo('periodico')"`}>Periódico</button>
+    </div>
+    <div class="card">
+      ${tipo === 'diario' ? '<div class="notice">Se suma automáticamente al cierre de la fecha elegida.</div>' : '<div class="notice">No afecta al cierre diario, pero cuenta como gasto fijo en el resumen anual.</div>'}
+      <div class="field"><label>Fecha</label><input type="date" id="g-fecha" value="${g.fecha}"></div>
+      <div class="field"><label>Categoría</label>
+        ${tipo === 'periodico' ? `
+        <input list="cat-periodico-list" id="g-categoria" value="${catLabel(cats, g.categoria)}" placeholder="Elige o escribe una categoría">
+        <datalist id="cat-periodico-list">
+          ${CAT_PERIODICO.map(cat => `<option value="${cat.label}">`).join('')}
+        </datalist>
+        ` : `
+        <select id="g-categoria">
+          ${cats.map(cat => `<option value="${cat.id}" ${g.categoria===cat.id?'selected':''}>${cat.label}</option>`).join('')}
+        </select>
+        `}
+      </div>
+      <div class="field"><label>Importe (€)</label><input type="number" step="0.01" id="g-importe" value="${g.importe}" placeholder="0.00"></div>
+      <div class="field"><label>Nota (opcional)</label><input type="text" id="g-nota" value="${g.nota||''}" placeholder="Detalle, proveedor, referencia…"></div>
+      <div class="btn-row">
+        ${editing ? `<button class="btn btn-danger" onclick="deleteGastoConfirm('${editing.id}')">Eliminar</button>` : ''}
+        <button class="btn btn-primary" onclick="saveGasto('${tipo}'${editing ? `, '${editing.id}'` : ''})">${editing ? 'Guardar cambios' : 'Añadir gasto'}</button>
+      </div>
+      ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingGastoId=null; render();">Cancelar</button>` : ''}
+    </div>
+
+    <div class="section-title" style="margin-top:24px;">Registro ${tipo === 'diario' ? 'diario' : 'periódico'}</div>
+    ${bodyHTML}
+  `;
+}
+
+function setGastoTipo(t){ state.gastoTipo = t; render(); }
+
+function gastoRowHTML(g, cats){
+  return `<div class="entry" onclick="editGasto('${g.id}')" style="cursor:pointer;">
+    <div class="entry-top">
+      <div class="entry-date">${catLabel(cats, g.categoria)}</div>
+      <div class="entry-amount">€${fmt(+g.importe||0)}</div>
+    </div>
+    <div class="entry-meta">${g.nota || 'Sin nota'} ${g.chofer ? '· ' + g.chofer : ''}</div>
+  </div>`;
+}
+
+function editGasto(id){ state.editingGastoId = id; render(); window.scrollTo(0,0); }
+
+async function saveGasto(tipo, id){
+  const importe = document.getElementById('g-importe').value;
+  if(!importe || +importe <= 0){ showToast('Indica un importe'); return; }
+  const g = {
+    id: id || uid(),
+    tipo,
+    fecha: document.getElementById('g-fecha').value || todayISO(),
+    categoria: document.getElementById('g-categoria').value,
+    importe: round2(importe),
+    nota: document.getElementById('g-nota').value.trim(),
+    chofer: state.driver,
+  };
+  if(id){
+    const idx = state.gastos.findIndex(x=>x.id===id);
+    state.gastos[idx] = g;
+  } else {
+    state.gastos.push(g);
+  }
+  state.gastoPrefillFecha = null;
+  state.editingGastoId = null;
+  await saveGastos();
+  showToast(id ? 'Gasto actualizado' : 'Gasto anotado');
+  render();
+}
+
+async function deleteGastoConfirm(id){
+  if(!confirm('¿Eliminar este gasto?')) return;
+  state.gastos = state.gastos.filter(x=>x.id!==id);
+  state.editingGastoId = null;
+  await saveGastos();
+  showToast('Gasto eliminado');
+  render();
+}
+
+/* ---------- SERVICIOS TAB ---------- */
+function renderServiciosTab(c){
+  const grouped = {};
+  [...state.servicios].sort((a,b)=> b.fecha.localeCompare(a.fecha)).forEach(s => {
+    const k = monthKey(s.fecha);
+    (grouped[k] = grouped[k] || []).push(s);
+  });
+  const months = Object.keys(grouped).sort().reverse();
+  const editing = state.editingServicioId ? state.servicios.find(x=>x.id===state.editingServicioId) : null;
+  const s = editing || { fecha: todayISO(), taxi:'', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag' };
+
+  c.innerHTML = `
+    <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${state.servicios.length} registrados</span></div>
+    ${driverPillHTML()}
+    <div class="card">
+      <div class="row2 field">
+        <div><label>Fecha</label><input type="date" id="s-fecha" value="${s.fecha}"></div>
+        <div><label>Nº taxi</label><input type="text" id="s-taxi" value="${s.taxi}" placeholder="29"></div>
+      </div>
+      <div class="field"><label>Cliente (opcional)</label><input type="text" id="s-cliente" value="${s.cliente}" placeholder="Nombre del cliente"></div>
+      <div class="row2 field">
+        <div><label>Origen</label><input type="text" id="s-origen" value="${s.origen}" placeholder="Punto de recogida"></div>
+        <div><label>Destino</label><input type="text" id="s-destino" value="${s.destino}" placeholder="Punto de destino"></div>
+      </div>
+      <div class="row2 field">
+        <div><label>Importe (€)</label><input type="number" step="0.01" id="s-importe" value="${s.importe}" placeholder="0.00"></div>
+        <div><label>Forma de pago</label>
+          <select id="s-pago">
+            <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
+            <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
+            <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        ${editing ? `<button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button>` : ''}
+        <button class="btn btn-primary" onclick="saveServicio(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Añadir servicio'}</button>
+      </div>
+      ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingServicioId=null; render();">Cancelar</button>` : ''}
+      <div class="field" style="margin-top:14px;"><label>Propina / redondeo cobrado de más (€)</label><input type="number" step="0.01" id="s-propina" value="${s.propina || ''}" placeholder="0.00"></div>
+      <div class="notice" style="margin-top:-2px;">Solo aplica si se pagó con tarjeta o transferencia y el cobro fue superior al importe del servicio. Va 100% para el chofer y no se reparte con la empresa.</div>
+      <div class="field"><label>Estado</label>
+        <select id="s-estado">
+          <option value="pag" ${s.estado==='pag'?'selected':''}>Pagado</option>
+          <option value="pend" ${s.estado==='pend'?'selected':''}>Pendiente</option>
+          <option value="anulado" ${s.estado==='anulado'?'selected':''}>Anulado</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px;">Registro</div>
+    ${months.length === 0 ? `<div class="card">${emptyHTML('Sin servicios todavía','Añade el primero arriba.')}</div>` :
+      months.map(mk => `
+        <div class="month-header">
+          <div class="month-name display">${monthLabel(mk)}</div>
+          <div class="month-total mono">€${fmt(grouped[mk].reduce((s,x)=> s + (x.estado!=='anulado' ? (+x.importe||0):0), 0))}</div>
+        </div>
+        <div class="card" style="padding:4px 16px;">
+          ${grouped[mk].map(servicioRowHTML).join('')}
+        </div>
+      `).join('')
+    }
+  `;
+}
+
+function servicioRowHTML(s){
+  const dt = new Date(s.fecha + 'T00:00:00');
+  const propina = +s.propina || 0;
+  return `<div class="entry" onclick="editServicio('${s.id}')" style="cursor:pointer;">
+    <div class="entry-top">
+      <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
+      <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
+    </div>
+    <div class="entry-meta">${[s.origen,s.destino].filter(Boolean).join(' → ') || 'Sin ruta'} ${s.taxi ? '· taxi '+s.taxi : ''}</div>
+    <div class="entry-tags">
+      <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
+      <span class="tag">${s.pago}</span>
+      ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function editServicio(id){ state.editingServicioId = id; render(); window.scrollTo(0,0); }
+
+async function saveServicio(id){
+  const fecha = document.getElementById('s-fecha').value || todayISO();
+  const importeVal = document.getElementById('s-importe').value;
+  if(!importeVal || +importeVal <= 0){ showToast('Indica el importe'); return; }
+  const cliente = document.getElementById('s-cliente').value.trim();
+  const pago = document.getElementById('s-pago').value;
+  const propinaVal = document.getElementById('s-propina').value;
+  const s = {
+    id: id || uid(),
+    fecha,
+    cliente,
+    origen: document.getElementById('s-origen').value.trim(),
+    destino: document.getElementById('s-destino').value.trim(),
+    importe: round2(importeVal),
+    pago,
+    propina: pago !== 'efectivo' && propinaVal ? round2(propinaVal) : '',
+    estado: document.getElementById('s-estado').value,
+    taxi: document.getElementById('s-taxi').value.trim(),
+    chofer: state.driver,
+  };
+  if(id){
+    const idx = state.servicios.findIndex(x=>x.id===id);
+    state.servicios[idx] = s;
+  } else {
+    state.servicios.push(s);
+  }
+  state.editingServicioId = null;
+  await saveServicios();
+  showToast(id ? 'Servicio actualizado' : 'Servicio añadido');
+  render();
+}
+
+async function deleteServicioConfirm(id){
+  if(!confirm('¿Eliminar este servicio?')) return;
+  state.servicios = state.servicios.filter(x=>x.id!==id);
+  state.editingServicioId = null;
+  await saveServicios();
+  showToast('Servicio eliminado');
+  render();
+}
+
+/* ---------- MANTENIMIENTO TAB ---------- */
+function renderMantenimientoTab(c){
+  const editing = state.editingMantenimientoId ? state.mantenimientos.find(x=>x.id===state.editingMantenimientoId) : null;
+  const m = editing || { fecha: todayISO(), km: ultimoKmFinCierre(), tipo: state.tiposMantenimiento[0] || '', coste:'', taller:'', proximoFecha:'', proximoKm:'', nota:'' };
+  const lista = [...state.mantenimientos].sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  const totalInvertido = state.mantenimientos.reduce((s,x)=> s + (+x.coste||0), 0);
+  const hoy = todayISO();
+  const kmActual = kmActualEstimado();
+  const urgentes = state.mantenimientos.filter(x => mantenimientoAvisos(x, kmActual, hoy).some(a => a.cls));
+
+  c.innerHTML = `
+    <div class="section-title">${editing ? 'Editar mantenimiento' : 'Nuevo mantenimiento'}<span class="sub">${state.mantenimientos.length} registrados</span></div>
+    ${urgentes.length ? `<div class="card" style="border-color:rgba(228,87,76,0.4);">
+      <div class="subhead" style="color:var(--coral);">⚠ ${urgentes.length} mantenimiento${urgentes.length===1?'':'s'} próximo${urgentes.length===1?'':'s'} o vencido${urgentes.length===1?'':'s'}</div>
+      ${urgentes.map(x => `<div class="entry-meta" style="margin-bottom:2px;">${x.tipo}: ${mantenimientoAvisos(x, kmActual, hoy).filter(a=>a.cls).map(a=>a.txt).join(' · ')}</div>`).join('')}
+    </div>` : ''}
+    <div class="card">
+      <div class="row2 field">
+        <div><label>Fecha</label><input type="date" id="mt-fecha" value="${m.fecha}" oninput="updateMantenimientoReferencia()"></div>
+        <div><label>Km del vehículo</label><input type="number" id="mt-km" value="${m.km}" placeholder="0" oninput="updateMantenimientoReferencia()">
+          ${!editing && ultimoKmFinCierre() ? `<div style="font-size:11px; color:var(--muted); margin-top:4px;">Autocompletado con el km fin del último cierre (editable)</div>` : ''}
+        </div>
+      </div>
+      <div class="field">
+        <label>Tipo</label>
+        <input list="tipo-mantenimiento-list" id="mt-tipo" value="${m.tipo || ''}" placeholder="Elige o escribe un tipo nuevo" oninput="updateMantenimientoReferencia()">
+        <datalist id="tipo-mantenimiento-list">
+          ${state.tiposMantenimiento.map(t => `<option value="${t}">`).join('')}
+        </datalist>
+      </div>
+      <div id="mt-referencia">${mantenimientoReferenciaHTML(m.tipo, m.fecha, m.km, editing ? editing.id : null)}</div>
+      <div class="row2 field">
+        <div><label>Coste (€)</label><input type="number" step="0.01" id="mt-coste" value="${m.coste}" placeholder="0.00"></div>
+        <div><label>Taller / proveedor</label><input type="text" id="mt-taller" value="${m.taller||''}" placeholder="Nombre del taller"></div>
+      </div>
+      <div class="notice">Próximo aviso opcional: por fecha, por km, o ambos. Avisamos 30 días o 1.000 km antes.</div>
+      <div class="row2 field">
+        <div><label>Próximo aviso (fecha)</label><input type="date" id="mt-proximaFecha" value="${m.proximoFecha||''}"></div>
+        <div><label>Próximo aviso (km)</label><input type="number" id="mt-proximoKm" value="${m.proximoKm||''}" placeholder="Ej. 120000"></div>
+      </div>
+      <div class="field"><label>Nota (opcional)</label><input type="text" id="mt-nota" value="${m.nota||''}" placeholder="Detalle, referencia, pieza…"></div>
+      <div class="btn-row">
+        ${editing ? `<button class="btn btn-danger" onclick="deleteMantenimientoConfirm('${editing.id}')">Eliminar</button>` : ''}
+        <button class="btn btn-primary" onclick="saveMantenimiento(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Añadir mantenimiento'}</button>
+      </div>
+      ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingMantenimientoId=null; render();">Cancelar</button>` : ''}
+    </div>
+
+    <div class="section-title" style="margin-top:24px;">Historial<span class="sub">€${fmt(totalInvertido)} invertidos</span></div>
+    ${lista.length === 0 ? `<div class="card">${emptyHTML('Sin mantenimientos','Anota aquí cambios de aceite, neumáticos, ITV, frenos y cualquier otra reparación.')}</div>` :
+      `<div class="card" style="padding:4px 16px;">${lista.map(x => mantenimientoRowHTML(x, kmActual, hoy)).join('')}</div>`}
+  `;
+}
+
+function ultimoKmFinCierre(){
+  const conKm = state.cierres.filter(c => c.kmFin);
+  if(!conKm.length) return '';
+  const ordenados = [...conKm].sort((a,b)=> a.fecha.localeCompare(b.fecha) || (a.horaCierre||'').localeCompare(b.horaCierre||''));
+  return ordenados[ordenados.length-1].kmFin;
+}
+
+function kmActualEstimado(){
+  const ultimo = ultimoKmFinCierre();
+  if(ultimo) return +ultimo;
+  const kms = [];
+  state.cierres.forEach(c => { if(c.kmInicio) kms.push(+c.kmInicio); });
+  state.mantenimientos.forEach(m => { if(m.km) kms.push(+m.km); });
+  return kms.length ? Math.max(...kms) : 0;
+}
+
+/* Avisa 30 días antes (fecha) o 1000 km antes (kilometraje) de que toque el próximo mantenimiento */
+function mantenimientoAvisos(m, kmActual, hoy){
+  const avisos = [];
+  if(m.proximoFecha){
+    const dias = Math.round((new Date(m.proximoFecha+'T00:00:00') - new Date(hoy+'T00:00:00')) / 86400000);
+    const fechaTxt = new Date(m.proximoFecha+'T00:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
+    let cls = '', txt;
+    if(dias < 0){ cls = 'anulado'; txt = `⚠ vencido hace ${Math.abs(dias)} día${Math.abs(dias)===1?'':'s'}`; }
+    else if(dias <= 30){ cls = 'pend'; txt = `⚠ en ${dias} día${dias===1?'':'s'} (${fechaTxt})`; }
+    else { txt = `aviso ${fechaTxt}`; }
+    avisos.push({cls, txt});
+  }
+  if(m.proximoKm){
+    const restante = Math.round((+m.proximoKm) - kmActual);
+    let cls = '', txt;
+    if(restante <= 0){ cls = 'anulado'; txt = `⚠ superado por ${Math.abs(restante).toLocaleString('es-ES')} km`; }
+    else if(restante <= 1000){ cls = 'pend'; txt = `⚠ en ${restante.toLocaleString('es-ES')} km`; }
+    else { txt = `aviso a los ${(+m.proximoKm).toLocaleString('es-ES')} km`; }
+    avisos.push({cls, txt});
+  }
+  return avisos;
+}
+
+function mantenimientoUltimoDeTipo(tipo, fecha, excludeId){
+  if(!tipo) return null;
+  const previos = state.mantenimientos
+    .filter(x => x.id !== excludeId && x.tipo && x.tipo.toLowerCase() === tipo.toLowerCase() && x.fecha <= fecha)
+    .sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  return previos[0] || null;
+}
+
+function mantenimientoReferenciaHTML(tipo, fecha, km, excludeId){
+  tipo = (tipo || '').trim();
+  fecha = fecha || todayISO();
+  const prev = mantenimientoUltimoDeTipo(tipo, fecha, excludeId);
+  if(!prev) return `<div class="notice">Sin registros anteriores de "${tipo || 'este tipo'}" para comparar.</div>`;
+  const dias = Math.round((new Date(fecha+'T00:00:00') - new Date(prev.fecha+'T00:00:00')) / 86400000);
+  const prevFechaTxt = new Date(prev.fecha+'T00:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+  let kmTxt = 'sin datos de km para comparar';
+  if(km && prev.km){
+    const kmDiff = (+km) - (+prev.km);
+    kmTxt = kmDiff >= 0 ? `${kmDiff.toLocaleString('es-ES')} km recorridos` : 'km introducidos menores que el registro anterior';
+  }
+  return `<div class="notice">Último "${prev.tipo}": ${prevFechaTxt} · hace ${dias} día${dias===1?'':'s'} · ${kmTxt}</div>`;
+}
+
+function updateMantenimientoReferencia(){
+  const tipoEl = document.getElementById('mt-tipo');
+  const fechaEl = document.getElementById('mt-fecha');
+  const kmEl = document.getElementById('mt-km');
+  const el = document.getElementById('mt-referencia');
+  if(!tipoEl || !fechaEl || !kmEl || !el) return;
+  const excludeId = state.editingMantenimientoId || null;
+  el.innerHTML = mantenimientoReferenciaHTML(tipoEl.value, fechaEl.value, kmEl.value, excludeId);
+}
+
+function mantenimientoRowHTML(m, kmActual, hoy){
+  const dt = new Date(m.fecha + 'T00:00:00');
+  const avisos = mantenimientoAvisos(m, kmActual, hoy);
+  return `<div class="entry" onclick="editMantenimiento('${m.id}')" style="cursor:pointer;">
+    <div class="entry-top">
+      <div class="entry-date">${m.tipo || 'Mantenimiento'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
+      <div class="entry-amount">€${fmt(+m.coste||0)}</div>
+    </div>
+    <div class="entry-meta">${m.taller || 'Sin taller'} ${m.km ? '· ' + m.km + ' km' : ''}</div>
+    ${avisos.length ? `<div class="entry-tags">${avisos.map(a => `<span class="tag ${a.cls}">${a.txt}</span>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+async function saveMantenimiento(id){
+  const fecha = document.getElementById('mt-fecha').value || todayISO();
+  const tipo = document.getElementById('mt-tipo').value.trim();
+  if(!tipo){ showToast('Indica el tipo de mantenimiento'); return; }
+  const m = {
+    id: id || uid(),
+    fecha,
+    km: document.getElementById('mt-km').value,
+    tipo,
+    coste: round2(document.getElementById('mt-coste').value),
+    taller: document.getElementById('mt-taller').value.trim(),
+    proximoFecha: document.getElementById('mt-proximaFecha').value,
+    proximoKm: document.getElementById('mt-proximoKm').value,
+    nota: document.getElementById('mt-nota').value.trim(),
+  };
+  if(id){
+    const idx = state.mantenimientos.findIndex(x=>x.id===id);
+    state.mantenimientos[idx] = m;
+  } else {
+    state.mantenimientos.push(m);
+  }
+  if(!state.tiposMantenimiento.some(t => t.toLowerCase() === tipo.toLowerCase())){
+    state.tiposMantenimiento.push(tipo);
+    await saveConfig();
+  }
+  state.editingMantenimientoId = null;
+  await saveMantenimientos();
+  showToast(id ? 'Mantenimiento actualizado' : 'Mantenimiento añadido');
+  render();
+}
+
+function editMantenimiento(id){ state.editingMantenimientoId = id; render(); window.scrollTo(0,0); }
+
+async function deleteMantenimientoConfirm(id){
+  if(!confirm('¿Eliminar este mantenimiento?')) return;
+  state.mantenimientos = state.mantenimientos.filter(x=>x.id!==id);
+  state.editingMantenimientoId = null;
+  await saveMantenimientos();
+  showToast('Mantenimiento eliminado');
+  render();
+}
+
+/* ---------- MENSUAL TAB ---------- */
+function shiftMonth(key, delta){
+  const [y,m] = key.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function changeMes(delta){
+  state.mesActual = shiftMonth(state.mesActual || monthKey(todayISO()), delta);
+  render();
+}
+
+function renderMensualTab(c){
+  const mes = state.mesActual || monthKey(todayISO());
+  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
+  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
+
+  const totals = cierresMes.reduce((acc, d) => {
+    const calc = cierreCalc(d);
+    acc.facturado += calc.facturado;
+    acc.efectivo += calc.efectivo;
+    acc.efectivoEmpresa += calc.efectivoEmpresa;
+    acc.gastosVar += calc.totalGastos;
+    acc.autopista += calc.autopista;
+    acc.empresa += calc.importeEmpresa;
+    acc.chofer += calc.importeChofer;
+    acc.propinas += calc.propinas;
+    acc.km += calc.kmJornada;
+    acc.dias += 1;
+    return acc;
+  }, { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, autopista:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
+
+  const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
+  const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
+  const esMesActual = mes === monthKey(todayISO());
+
+  c.innerHTML = `
+    <div class="section-title">Cierre mensual<span class="sub">${esMesActual ? 'mes en curso' : ''}</span></div>
+    <div class="card" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px;">
+      <button class="btn btn-ghost" style="width:auto; padding:8px 14px;" onclick="changeMes(-1)">‹</button>
+      <div class="display" style="font-size:19px;">${monthLabel(mes)}</div>
+      <button class="btn btn-ghost" style="width:auto; padding:8px 14px;" onclick="changeMes(1)">›</button>
+    </div>
+
+    ${cierresMes.length === 0 && serviciosMes.length === 0 ? `<div class="card">${emptyHTML('Sin datos este mes', 'Registra cierres o servicios para verlos aquí.')}</div>` : `
+    <div class="card">
+      <div class="subhead">Resultado del mes</div>
+      <div class="row2" style="margin-bottom:10px;">
+        <div class="meter-cell teal"><div class="label">Facturado</div><div class="value mono" style="font-size:18px;">€${fmt(totals.facturado)}</div></div>
+        <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
+      </div>
+      <div class="meter-cell teal">
+        <div class="label">Efectivo de empresa</div>
+        <div class="value mono" style="font-size:18px;">€${fmt(totals.efectivoEmpresa)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Reparto</div>
+      <div class="row2">
+        <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
+        <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
+      </div>
+      ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="subhead">Gastos y servicios</div>
+      <div class="row2" style="margin-bottom:10px;">
+        <div class="meter-cell"><div class="label">Gastos variables</div><div class="value mono" style="font-size:14px;">€${fmt(totals.gastosVar)}</div></div>
+        <div class="meter-cell"><div class="label">Gastos fijos</div><div class="value mono" style="font-size:14px;">€${fmt(gastosFijosTotal)}</div></div>
+      </div>
+      <div class="row2">
+        <div class="meter-cell"><div class="label">Autopista</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
+        <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">€${fmt(serviciosTotal)}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Actividad</div>
+      <div class="row2">
+        <div class="meter-cell"><div class="label">Días trabajados</div><div class="value mono" style="font-size:14px;">${totals.dias}</div></div>
+        <div class="meter-cell"><div class="label">Km recorridos</div><div class="value mono" style="font-size:14px;">${fmt(totals.km)}</div></div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px;">Días del mes</div>
+    <div class="card" style="padding:4px 16px;">
+      ${cierresMes.length === 0 ? emptyHTML('Sin cierres este mes','') :
+        [...cierresMes].sort((a,b)=> b.fecha.localeCompare(a.fecha)).map(cierreRowHTML).join('')}
+    </div>
+    `}
+  `;
+}
+
+/* ---------- ANUAL TAB ---------- */
+function renderAnualTab(c){
+  const byMonth = {};
+  const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, gastosFijos:0, autopista:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
+
+  state.cierres.forEach(d => {
+    const k = monthKey(d.fecha);
+    const calc = cierreCalc(d);
+    const m = ensure(k);
+    m.facturado += calc.facturado;
+    m.efectivo += calc.efectivo;
+    m.efectivoEmpresa += calc.efectivoEmpresa;
+    m.gastosVar += calc.totalGastos;
+    m.autopista += calc.autopista;
+    m.empresa += calc.importeEmpresa;
+    m.chofer += calc.importeChofer;
+    m.propinas += calc.propinas;
+    m.km += calc.kmJornada;
+    m.dias += 1;
+  });
+  state.gastos.filter(g => g.tipo === 'periodico').forEach(g => {
+    const k = monthKey(g.fecha);
+    ensure(k).gastosFijos += (+g.importe || 0);
+  });
+  todosLosServicios().filter(s => s.estado !== 'anulado').forEach(s => {
+    const k = monthKey(s.fecha);
+    ensure(k).servicios += (+s.importe || 0);
+  });
+
+  const months = Object.keys(byMonth).sort().reverse();
+  const years = [...new Set(months.map(m=>m.slice(0,4)))];
+  const maxFact = Math.max(1, ...months.map(m=>byMonth[m].facturado));
+
+  const yearBlocks = years.map(y => {
+    const ms = months.filter(m=>m.startsWith(y));
+    const totals = ms.reduce((acc,m)=>{
+      Object.keys(acc).forEach(key => acc[key] += byMonth[m][key]);
+      return acc;
+    }, {facturado:0,efectivo:0,efectivoEmpresa:0,gastosVar:0,gastosFijos:0,autopista:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
+    return `
+      <div class="month-header"><div class="month-name display">${y}</div><div class="month-total mono">€${fmt(totals.facturado)}</div></div>
+
+      <div class="card">
+        <div class="subhead">Resultado del año</div>
+        <div class="row2" style="margin-bottom:10px;">
+          <div class="meter-cell teal"><div class="label">Facturado</div><div class="value mono" style="font-size:18px;">€${fmt(totals.facturado)}</div></div>
+          <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
+        </div>
+        <div class="meter-cell teal">
+          <div class="label">Efectivo de empresa</div>
+          <div class="value mono" style="font-size:18px;">€${fmt(totals.efectivoEmpresa)}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="subhead">Reparto</div>
+        <div class="row2">
+          <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
+          <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
+        </div>
+        ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+      </div>
+
+      <div class="card">
+        <div class="subhead">Gastos y servicios</div>
+        <div class="row2" style="margin-bottom:10px;">
+          <div class="meter-cell"><div class="label">Gastos variables</div><div class="value mono" style="font-size:14px;">€${fmt(totals.gastosVar)}</div></div>
+          <div class="meter-cell"><div class="label">Gastos fijos</div><div class="value mono" style="font-size:14px;">€${fmt(totals.gastosFijos)}</div></div>
+        </div>
+        <div class="row2">
+          <div class="meter-cell"><div class="label">Autopista</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
+          <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">€${fmt(totals.servicios)}</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="subhead">Actividad</div>
+        <div class="row2">
+          <div class="meter-cell"><div class="label">Días trabajados</div><div class="value mono" style="font-size:14px;">${totals.dias}</div></div>
+          <div class="meter-cell"><div class="label">Km recorridos</div><div class="value mono" style="font-size:14px;">${fmt(totals.km)}</div></div>
+        </div>
+      </div>
+
+      ${ms.map(m => `
+        <div class="bar-row">
+          <div class="bar-label">${monthLabel(m).split(' ')[0].slice(0,3)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(byMonth[m].facturado/maxFact*100).toFixed(1)}%"></div></div>
+          <div class="bar-value mono">€${fmt(byMonth[m].facturado)}</div>
+        </div>
+      `).join('')}
+    `;
+  }).join('');
+
+  c.innerHTML = `
+    <div class="section-title">Resumen anual<span class="sub">calculado desde los cierres y gastos</span></div>
+    ${months.length === 0 ? `<div class="card">${emptyHTML('Sin datos todavía','Registra cierres y gastos para ver el resumen.')}</div>` : yearBlocks}
+  `;
+}
+
+/* ---------- AJUSTES TAB ---------- */
+function renderAjustesTab(c){
+  const bytes = new Blob([JSON.stringify(state.cierres)+JSON.stringify(state.servicios)+JSON.stringify(state.gastos)]).size;
+  c.innerHTML = `
+    <div class="section-title">Ajustes</div>
+    <div class="notice">Esta app guarda los datos solo en este navegador (localStorage), sin pasar por ningún servidor. Si borras datos de navegación, desinstalas el navegador o cambias de dispositivo, los datos se pierden. Haz copias de seguridad con regularidad.</div>
+
+    <div class="card">
+      <div class="subhead">Copia de seguridad</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:14px;">${state.cierres.length} cierres · ${todosLosServicios().length} servicios (${state.servicios.length} sin cerrar) · ${state.gastos.length} gastos · ${state.mantenimientos.length} mantenimientos · ~${(bytes/1024).toFixed(1)} KB</div>
+      <button class="btn btn-primary" style="margin-bottom:10px;" onclick="exportBackup()">⬇ Exportar copia de seguridad</button>
+      <label class="btn btn-ghost" style="display:block; text-align:center;">
+        ⬆ Importar copia de seguridad
+        <input type="file" accept="application/json" id="import-file" style="display:none;" onchange="importBackup(this.files[0])">
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Choferes</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Nombres usados al etiquetar cada cierre, gasto y servicio.</div>
+      <div class="row2 field">
+        <div><label>Chofer 1</label><input type="text" id="a-driver1" value="${state.drivers[0]}"></div>
+        <div><label>Chofer 2</label><input type="text" id="a-driver2" value="${state.drivers[1]}"></div>
+      </div>
+      <button class="btn btn-ghost" onclick="saveDriverNames()">Guardar nombres</button>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Borrar todo</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Elimina todos los cierres, gastos y servicios de este navegador. No se puede deshacer.</div>
+      <button class="btn btn-danger" onclick="wipeAllData()">Borrar todos los datos</button>
+    </div>
+  `;
+}
+
+function exportBackup(){
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    drivers: state.drivers,
+    pctEmpresa: state.pctEmpresa,
+    tiposMantenimiento: state.tiposMantenimiento,
+    cierres: state.cierres,
+    servicios: state.servicios,
+    gastos: state.gastos,
+    mantenimientos: state.mantenimientos,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `taxi-cierre-backup-${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Copia exportada');
+}
+
+function importBackup(file){
+  if(!file) return;
+  if(!confirm('Esto sustituirá TODOS los datos actuales de este navegador por los del archivo. ¿Continuar?')) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try{
+      const payload = JSON.parse(e.target.result);
+      state.cierres = Array.isArray(payload.cierres) ? payload.cierres : [];
+      state.servicios = Array.isArray(payload.servicios) ? payload.servicios : [];
+      state.gastos = Array.isArray(payload.gastos) ? payload.gastos : [];
+      state.mantenimientos = Array.isArray(payload.mantenimientos) ? payload.mantenimientos : [];
+      if(Array.isArray(payload.drivers) && payload.drivers.length === 2) state.drivers = payload.drivers;
+      if(payload.pctEmpresa) state.pctEmpresa = payload.pctEmpresa;
+      if(Array.isArray(payload.tiposMantenimiento) && payload.tiposMantenimiento.length) state.tiposMantenimiento = payload.tiposMantenimiento;
+      if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
+      await saveCierres(); await saveServicios(); await saveGastos(); await saveMantenimientos(); await saveConfig();
+      showToast('Copia importada correctamente');
+      render();
+    }catch(err){
+      showToast('El archivo no es una copia de seguridad válida');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function saveDriverNames(){
+  const d1 = document.getElementById('a-driver1').value.trim() || 'Chofer 1';
+  const d2 = document.getElementById('a-driver2').value.trim() || 'Chofer 2';
+  state.drivers = [d1, d2];
+  if(!state.drivers.includes(state.driver)) state.driver = d1;
+  saveConfig();
+  showToast('Nombres guardados');
+  render();
+}
+
+function wipeAllData(){
+  if(!confirm('Esto borrará TODOS los cierres, gastos, servicios y mantenimientos de este navegador. ¿Seguro?')) return;
+  if(!confirm('Última confirmación: esta acción no se puede deshacer. ¿Borrar todo?')) return;
+  state.cierres = []; state.servicios = []; state.gastos = []; state.mantenimientos = [];
+  saveCierres(); saveServicios(); saveGastos(); saveMantenimientos();
+  showToast('Datos borrados');
+  render();
+}
+
+/* ---------- init ---------- */
+loadData();
+</script>
+</body>
+</html>

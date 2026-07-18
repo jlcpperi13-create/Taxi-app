@@ -2,12 +2,13 @@
 <html lang="es">
 <head>
   <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#FFC107">
+<meta name="theme-color" content="#FFB020">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Taxímetro · Cierre</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --bg: #15181A;
@@ -1228,6 +1229,11 @@ function renderMensualTab(c){
       <button class="btn btn-ghost" style="width:auto; padding:8px 14px;" onclick="changeMes(1)">›</button>
     </div>
 
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-ghost" onclick="generarPDFMensual()">📄 Descargar PDF</button>
+      <button class="btn btn-ghost" onclick="compartirPDFMensual()">📤 Compartir</button>
+    </div>
+
     ${cierresMes.length === 0 && serviciosMes.length === 0 ? `<div class="card">${emptyHTML('Sin datos este mes', 'Registra cierres o servicios para verlos aquí.')}</div>` : `
     <div class="card">
       <div class="subhead">Resultado del mes</div>
@@ -1321,6 +1327,11 @@ function renderAnualTab(c){
     return `
       <div class="month-header"><div class="month-name display">${y}</div><div class="month-total mono">€${fmt(totals.facturado)}</div></div>
 
+      <div class="btn-row" style="margin-bottom:14px;">
+        <button class="btn btn-ghost" onclick="generarPDFAnual('${y}')">📄 Descargar PDF</button>
+        <button class="btn btn-ghost" onclick="compartirPDFAnual('${y}')">📤 Compartir</button>
+      </div>
+
       <div class="card">
         <div class="subhead">Resultado del año</div>
         <div class="row2" style="margin-bottom:10px;">
@@ -1376,6 +1387,183 @@ function renderAnualTab(c){
     <div class="section-title">Resumen anual<span class="sub">calculado desde los cierres y gastos</span></div>
     ${months.length === 0 ? `<div class="card">${emptyHTML('Sin datos todavía','Registra cierres y gastos para ver el resumen.')}</div>` : yearBlocks}
   `;
+}
+
+/* ---------- PDF EXPORT ---------- */
+function buildClosingPDF(title, subtitle, sections){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const marginX = 40;
+  let y = 50;
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text(title, marginX, y);
+  y += 22;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(11);
+  doc.setTextColor(120);
+  doc.text(String(subtitle), marginX, y);
+  doc.setTextColor(0);
+  y += 30;
+
+  sections.forEach(section => {
+    if(y > 760){ doc.addPage(); y = 50; }
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text(section.heading, marginX, y);
+    y += 18;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(11);
+    section.rows.forEach(([label, value]) => {
+      if(y > 780){ doc.addPage(); y = 50; }
+      doc.text(String(label), marginX, y);
+      doc.text(String(value), 400, y, { align:'right' });
+      y += 16;
+    });
+    y += 14;
+  });
+
+  doc.setFontSize(9);
+  doc.setTextColor(150);
+  doc.text(`Generado el ${new Date().toLocaleString('es-ES')}`, marginX, 810);
+  return doc;
+}
+
+function seccionesDesdeTotales(totals, extra){
+  return [
+    { heading:'Resultado', rows:[
+      ['Facturado', `€${fmt(totals.facturado)}`],
+      ['Efectivo', `€${fmt(totals.efectivo)}`],
+      ['Efectivo de empresa', `€${fmt(totals.efectivoEmpresa)}`],
+    ]},
+    { heading:'Reparto', rows:[
+      ['Empresa', `€${fmt(totals.empresa)}`],
+      ['Chofer', `€${fmt(totals.chofer)}`],
+      ...(totals.propinas ? [['Propinas/redondeo (chofer)', `€${fmt(totals.propinas)}`]] : []),
+    ]},
+    { heading:'Gastos y servicios', rows:[
+      ['Gastos variables', `€${fmt(totals.gastosVar)}`],
+      ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
+      ['Autopista', `€${fmt(totals.autopista)}`],
+      ['Servicios', `€${fmt(extra.servicios)}`],
+    ]},
+    { heading:'Actividad', rows:[
+      ['Días trabajados', `${totals.dias}`],
+      ['Km recorridos', `${fmt(totals.km)}`],
+    ]},
+  ];
+}
+
+function totalesMes(mes){
+  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
+  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
+  const totals = cierresMes.reduce((acc, d) => {
+    const calc = cierreCalc(d);
+    acc.facturado += calc.facturado;
+    acc.efectivo += calc.efectivo;
+    acc.efectivoEmpresa += calc.efectivoEmpresa;
+    acc.gastosVar += calc.totalGastos;
+    acc.autopista += calc.autopista;
+    acc.empresa += calc.importeEmpresa;
+    acc.chofer += calc.importeChofer;
+    acc.propinas += calc.propinas;
+    acc.km += calc.kmJornada;
+    acc.dias += 1;
+    return acc;
+  }, { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, autopista:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
+  const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
+  const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
+  return { totals, extra: { servicios: serviciosTotal, gastosFijos: gastosFijosTotal } };
+}
+
+function nombreArchivoMes(mes){
+  return `cierre_${monthLabel(mes).replace(' ', '_')}.pdf`;
+}
+
+function generarPDFMensual(){
+  const mes = state.mesActual || monthKey(todayISO());
+  const { totals, extra } = totalesMes(mes);
+  const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra));
+  doc.save(nombreArchivoMes(mes));
+  showToast('PDF descargado');
+}
+
+async function compartirPDFMensual(){
+  const mes = state.mesActual || monthKey(todayISO());
+  const { totals, extra } = totalesMes(mes);
+  const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra));
+  const nombre = nombreArchivoMes(mes);
+  const blob = doc.output('blob');
+  const file = new File([blob], nombre, { type:'application/pdf' });
+  if(navigator.canShare && navigator.canShare({ files:[file] })){
+    try{
+      await navigator.share({ files:[file], title:'Cierre mensual', text:`Cierre mensual — ${monthLabel(mes)}` });
+    }catch(e){ /* el usuario canceló el compartir */ }
+  } else {
+    doc.save(nombre);
+    showToast('Tu dispositivo no permite compartir directo, se descargó el PDF');
+  }
+}
+
+function totalesAnio(year){
+  const byMonth = {};
+  const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, gastosFijos:0, autopista:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
+  state.cierres.forEach(d => {
+    const k = monthKey(d.fecha);
+    if(!k.startsWith(year)) return;
+    const calc = cierreCalc(d);
+    const m = ensure(k);
+    m.facturado += calc.facturado;
+    m.efectivo += calc.efectivo;
+    m.efectivoEmpresa += calc.efectivoEmpresa;
+    m.gastosVar += calc.totalGastos;
+    m.autopista += calc.autopista;
+    m.empresa += calc.importeEmpresa;
+    m.chofer += calc.importeChofer;
+    m.propinas += calc.propinas;
+    m.km += calc.kmJornada;
+    m.dias += 1;
+  });
+  state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha).startsWith(year)).forEach(g => {
+    ensure(monthKey(g.fecha)).gastosFijos += (+g.importe || 0);
+  });
+  todosLosServicios().filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
+    ensure(monthKey(s.fecha)).servicios += (+s.importe || 0);
+  });
+  const months = Object.keys(byMonth).sort();
+  const totals = months.reduce((acc,m)=>{
+    Object.keys(acc).forEach(key => acc[key] += byMonth[m][key]);
+    return acc;
+  }, {facturado:0,efectivo:0,efectivoEmpresa:0,gastosVar:0,gastosFijos:0,autopista:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
+  return { totals, extra: { servicios: totals.servicios, gastosFijos: totals.gastosFijos } };
+}
+
+function nombreArchivoAnio(year){
+  return `cierre_anual_${year}.pdf`;
+}
+
+function generarPDFAnual(year){
+  const { totals, extra } = totalesAnio(year);
+  const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra));
+  doc.save(nombreArchivoAnio(year));
+  showToast('PDF descargado');
+}
+
+async function compartirPDFAnual(year){
+  const { totals, extra } = totalesAnio(year);
+  const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra));
+  const nombre = nombreArchivoAnio(year);
+  const blob = doc.output('blob');
+  const file = new File([blob], nombre, { type:'application/pdf' });
+  if(navigator.canShare && navigator.canShare({ files:[file] })){
+    try{
+      await navigator.share({ files:[file], title:'Resumen anual', text:`Resumen anual — ${year}` });
+    }catch(e){ /* el usuario canceló el compartir */ }
+  } else {
+    doc.save(nombre);
+    showToast('Tu dispositivo no permite compartir directo, se descargó el PDF');
+  }
 }
 
 /* ---------- AJUSTES TAB ---------- */

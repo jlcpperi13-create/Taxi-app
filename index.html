@@ -228,6 +228,7 @@ let state = {
   gastoPrefillFecha: null,
   skipPrefill: false,
   mesActual: null,
+  workDate: null,
 };
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -412,13 +413,32 @@ function cierreCalc(d){
 /* Contador del turno EN CURSO (aún no cerrado) del chofer activo. Al pulsar "Cerrar turno" todo lo
    que suma aquí queda archivado dentro del cierre y este contador vuelve a cero automáticamente,
    tanto si sigue el mismo chofer como si entra el otro. */
-function todayMeter(chofer){
+function todayMeter(chofer, fecha){
   chofer = chofer || state.driver;
-  const dateStr = todayISO();
+  const dateStr = fecha || state.workDate || todayISO();
   const draft = { fecha: dateStr, chofer };
   const facturado = round2(serviciosDeCierre(draft).filter(s => s.estado !== 'anulado').reduce((s,x)=> s + (+x.importe||0), 0));
   const calc = cierreCalc({ ...draft, facturado });
   return { ...calc, gastos: calc.totalGastos };
+}
+function fechaCorta(iso){
+  const dt = new Date((iso || todayISO()) + 'T00:00:00');
+  return dt.toLocaleDateString('es-ES',{weekday:'short', day:'numeric', month:'short'});
+}
+function onMeterFechaChange(v){
+  state.workDate = v || todayISO();
+  render();
+}
+function updateMeterPanel(){
+  const fecha = state.workDate || todayISO();
+  const esHoy = fecha === todayISO();
+  const m = todayMeter(state.driver, fecha);
+  const map = {'meter-facturado': m.facturado, 'meter-efectivo': m.efectivo, 'meter-gastos': m.gastos, 'meter-efectivo-empresa': m.efectivoEmpresa};
+  Object.entries(map).forEach(([id, val]) => { const el = document.getElementById(id); if(el) el.textContent = `€${fmt(val)}`; });
+  const label = document.getElementById('meter-label-facturado');
+  if(label) label.textContent = esHoy ? 'Hoy facturado' : 'Facturado';
+  const resetBtn = document.getElementById('meter-reset-btn');
+  if(resetBtn) resetBtn.style.display = esHoy ? 'none' : 'inline-flex';
 }
 
 /* ---------- render root ---------- */
@@ -428,21 +448,26 @@ function render(){
     app.innerHTML = `<div class="loading">Cargando datos del cierre…</div>`;
     return;
   }
-  const m = todayMeter();
+  const fechaTrabajo = state.workDate || todayISO();
+  const esHoy = fechaTrabajo === todayISO();
+  const m = todayMeter(state.driver, fechaTrabajo);
   app.innerHTML = `
     <div class="meter">
       <div class="meter-top">
         <div class="meter-brand"><span class="dot"></span>TAXÍMETRO · CIERRE</div>
-        <div class="meter-date">${new Date().toLocaleDateString('es-ES',{weekday:'short', day:'numeric', month:'short'})}</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="date" id="meter-fecha" value="${fechaTrabajo}" onchange="onMeterFechaChange(this.value)" style="background:transparent; border:none; color:inherit; font:inherit; padding:0; text-align:right;">
+          <button id="meter-reset-btn" onclick="onMeterFechaChange('${todayISO()}')" style="display:${esHoy?'none':'inline-flex'}; background:rgba(255,255,255,.18); border:none; border-radius:6px; padding:3px 8px; font-size:11px; color:inherit; white-space:nowrap;">Hoy</button>
+        </div>
       </div>
       <div class="meter-readout">
-        <div class="meter-cell"><div class="label">Hoy facturado</div><div class="value mono">€${fmt(m.facturado)}</div></div>
-        <div class="meter-cell teal"><div class="label">Efectivo</div><div class="value mono">€${fmt(m.efectivo)}</div></div>
-        <div class="meter-cell"><div class="label">Gastos</div><div class="value mono">€${fmt(m.gastos)}</div></div>
+        <div class="meter-cell"><div class="label" id="meter-label-facturado">${esHoy ? 'Hoy facturado' : 'Facturado'}</div><div class="value mono" id="meter-facturado">€${fmt(m.facturado)}</div></div>
+        <div class="meter-cell teal"><div class="label">Efectivo</div><div class="value mono" id="meter-efectivo">€${fmt(m.efectivo)}</div></div>
+        <div class="meter-cell"><div class="label">Gastos</div><div class="value mono" id="meter-gastos">€${fmt(m.gastos)}</div></div>
       </div>
       <div class="meter-cell teal" style="margin-top:10px;">
         <div class="label">Efectivo de empresa</div>
-        <div class="value mono" style="font-size:22px;">€${fmt(m.efectivoEmpresa)}</div>
+        <div class="value mono" id="meter-efectivo-empresa" style="font-size:22px;">€${fmt(m.efectivoEmpresa)}</div>
       </div>
     </div>
     <div class="content" id="content"></div>
@@ -499,10 +524,10 @@ function setDriver(d){ state.driver = d; saveConfig(); render(); }
 
 function renderCierreTab(c){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
-  const d = editing || { fecha: todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: state.pctEmpresa };
-  if(!editing && d.fecha === todayISO() && !state.skipPrefill){
-    const hoyFacturado = round2(todayMeter().facturado);
-    if(hoyFacturado > 0) d.facturado = hoyFacturado;
+  const d = editing || { fecha: state.workDate || todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: state.pctEmpresa };
+  if(!editing && !state.skipPrefill){
+    const facturadoDia = round2(todayMeter(d.chofer, d.fecha).facturado);
+    if(facturadoDia > 0) d.facturado = facturadoDia;
   }
   state.skipPrefill = false;
   const calc = cierreCalc(d);
@@ -519,7 +544,7 @@ function renderCierreTab(c){
       <div class="subhead">Datos del día</div>
       <input type="hidden" id="f-chofer" value="${d.chofer}">
       <div class="row2 field">
-        <div><label>Fecha</label><input type="date" id="f-fecha" value="${d.fecha}" onchange="liveCalc()"></div>
+        <div><label>Fecha</label><input type="date" id="f-fecha" value="${d.fecha}" onchange="onFechaCierreChange()"></div>
         <div><label>Clientes</label><input type="number" id="f-clientes" value="${d.clientes}" placeholder="0"></div>
       </div>
       <div class="field"><label>Facturado total (€)</label><input type="number" step="0.01" id="f-facturado" value="${d.facturado}" placeholder="0.00" oninput="liveCalc()"></div>
@@ -641,6 +666,21 @@ function setPct(p){
   render();
 }
 
+function onFechaCierreChange(){
+  const fecha = document.getElementById('f-fecha').value || todayISO();
+  state.workDate = fecha;
+  updateMeterPanel();
+  const meterFechaInput = document.getElementById('meter-fecha');
+  if(meterFechaInput) meterFechaInput.value = fecha;
+  const facturadoInput = document.getElementById('f-facturado');
+  if(facturadoInput && !facturadoInput.value){
+    const chofer = document.getElementById('f-chofer').value || state.driver;
+    const totalDia = round2(todayMeter(chofer, fecha).facturado);
+    if(totalDia > 0) facturadoInput.value = totalDia;
+  }
+  liveCalc();
+}
+
 function liveCalc(){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
   const d = {
@@ -716,7 +756,7 @@ async function saveCierre(id, stampNow){
     state.cierres.push(d);
   }
   state.editingCierreId = null;
-  if(wasNew) state.skipPrefill = true;
+  if(wasNew){ state.skipPrefill = true; state.workDate = null; }
   await saveCierres();
   await saveServicios();
   await saveGastos();
@@ -754,7 +794,7 @@ function renderGastosTab(c){
   const editing = state.editingGastoId ? state.gastos.find(x=>x.id===state.editingGastoId) : null;
   const tipo = editing ? editing.tipo : state.gastoTipo;
   const cats = tipo === 'diario' ? CAT_DIARIO : CAT_PERIODICO;
-  const prefillFecha = state.gastoPrefillFecha || todayISO();
+  const prefillFecha = state.gastoPrefillFecha || state.workDate || todayISO();
   const g = editing || { fecha: prefillFecha, categoria: cats[0].id, importe: '', nota: '' };
   const list = state.gastos.filter(x => x.tipo === tipo);
 
@@ -887,7 +927,7 @@ function renderServiciosTab(c){
   });
   const months = Object.keys(grouped).sort().reverse();
   const editing = state.editingServicioId ? state.servicios.find(x=>x.id===state.editingServicioId) : null;
-  const s = editing || { fecha: todayISO(), taxi:'', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag' };
+  const s = editing || { fecha: state.workDate || todayISO(), taxi:'', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag' };
 
   c.innerHTML = `
     <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${state.servicios.length} registrados</span></div>

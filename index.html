@@ -576,6 +576,10 @@ function renderCierreTab(c){
         <div class="meter-cell teal"><div class="label">Efectivo</div><div class="value mono" id="calc-efectivo" style="font-size:20px;">€${fmt(calc.efectivo)}</div></div>
         <div class="meter-cell"><div class="label">Tarjeta/TPV/Transf.</div><div class="value mono" id="calc-tarjeta" style="font-size:14px;">−€${fmt(calc.tarjetaBoxTotal)}</div></div>
       </div>
+      <div class="meter-cell" style="margin-top:10px;">
+        <div class="label">Cobrado tarjeta/transf. (servicios)</div>
+        <div class="value mono" id="calc-tarjeta-servicios" style="font-size:14px;">€${fmt(calc.cardServicios)}</div>
+      </div>
       <div class="meter-cell teal" style="margin-top:10px;">
         <div class="label">Efectivo de empresa</div>
         <div class="value mono" id="calc-efectivo-empresa" style="font-size:20px;">€${fmt(calc.efectivoEmpresa)}</div>
@@ -696,6 +700,8 @@ function liveCalc(){
   const calc = cierreCalc(d);
   document.getElementById('calc-efectivo').textContent = `€${fmt(calc.efectivo)}`;
   document.getElementById('calc-tarjeta').textContent = `−€${fmt(calc.tarjetaBoxTotal)}`;
+  const tarjetaServEl = document.getElementById('calc-tarjeta-servicios');
+  if(tarjetaServEl) tarjetaServEl.textContent = `€${fmt(calc.cardServicios)}`;
   document.getElementById('calc-efectivo-empresa').textContent = `€${fmt(calc.efectivoEmpresa)}`;
   document.getElementById('calc-km').textContent = `${fmt(calc.kmJornada)}`;
   document.getElementById('calc-euros-km').textContent = `€${fmt(calc.eurosPorKm)}`;
@@ -1247,6 +1253,7 @@ function renderMensualTab(c){
     acc.facturado += calc.facturado;
     acc.efectivo += calc.efectivo;
     acc.efectivoEmpresa += calc.efectivoEmpresa;
+    acc.cardServicios += calc.cardServicios;
     acc.gastosVar += calc.totalGastos;
     acc.autopista += calc.autopista;
     acc.empresa += calc.importeEmpresa;
@@ -1255,8 +1262,7 @@ function renderMensualTab(c){
     acc.km += calc.kmJornada;
     acc.dias += 1;
     return acc;
-  }, { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, autopista:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
-
+  }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
   const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
   const esMesActual = mes === monthKey(todayISO());
@@ -1280,6 +1286,10 @@ function renderMensualTab(c){
       <div class="row2" style="margin-bottom:10px;">
         <div class="meter-cell teal"><div class="label">Facturado</div><div class="value mono" style="font-size:18px;">€${fmt(totals.facturado)}</div></div>
         <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
+      </div>
+      <div class="meter-cell" style="margin-bottom:10px;">
+        <div class="label">Cobrado tarjeta/transf. (servicios)</div>
+        <div class="value mono" style="font-size:14px;">€${fmt(totals.cardServicios)}</div>
       </div>
       <div class="meter-cell teal">
         <div class="label">Efectivo de empresa</div>
@@ -1328,7 +1338,7 @@ function renderMensualTab(c){
 /* ---------- ANUAL TAB ---------- */
 function renderAnualTab(c){
   const byMonth = {};
-  const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, gastosFijos:0, autopista:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
+  const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, gastosFijos:0, autopista:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
 
   state.cierres.forEach(d => {
     const k = monthKey(d.fecha);
@@ -1337,6 +1347,7 @@ function renderAnualTab(c){
     m.facturado += calc.facturado;
     m.efectivo += calc.efectivo;
     m.efectivoEmpresa += calc.efectivoEmpresa;
+    m.cardServicios += calc.cardServicios;
     m.gastosVar += calc.totalGastos;
     m.autopista += calc.autopista;
     m.empresa += calc.importeEmpresa;
@@ -1363,7 +1374,7 @@ function renderAnualTab(c){
     const totals = ms.reduce((acc,m)=>{
       Object.keys(acc).forEach(key => acc[key] += byMonth[m][key]);
       return acc;
-    }, {facturado:0,efectivo:0,efectivoEmpresa:0,gastosVar:0,gastosFijos:0,autopista:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
+    }, {facturado:0,efectivo:0,efectivoEmpresa:0,cardServicios:0,gastosVar:0,gastosFijos:0,autopista:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
     return `
       <div class="month-header"><div class="month-name display">${y}</div><div class="month-total mono">€${fmt(totals.facturado)}</div></div>
 
@@ -1377,6 +1388,10 @@ function renderAnualTab(c){
         <div class="row2" style="margin-bottom:10px;">
           <div class="meter-cell teal"><div class="label">Facturado</div><div class="value mono" style="font-size:18px;">€${fmt(totals.facturado)}</div></div>
           <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
+        </div>
+        <div class="meter-cell" style="margin-bottom:10px;">
+          <div class="label">Cobrado tarjeta/transf. (servicios)</div>
+          <div class="value mono" style="font-size:14px;">€${fmt(totals.cardServicios)}</div>
         </div>
         <div class="meter-cell teal">
           <div class="label">Efectivo de empresa</div>
@@ -1474,6 +1489,7 @@ function seccionesDesdeTotales(totals, extra){
     { heading:'Resultado', rows:[
       ['Facturado', `€${fmt(totals.facturado)}`],
       ['Efectivo', `€${fmt(totals.efectivo)}`],
+      ['Cobrado tarjeta/transf. (servicios)', `€${fmt(totals.cardServicios)}`],
       ['Efectivo de empresa', `€${fmt(totals.efectivoEmpresa)}`],
     ]},
     { heading:'Reparto', rows:[
@@ -1503,6 +1519,7 @@ function totalesMes(mes){
     acc.facturado += calc.facturado;
     acc.efectivo += calc.efectivo;
     acc.efectivoEmpresa += calc.efectivoEmpresa;
+    acc.cardServicios += calc.cardServicios;
     acc.gastosVar += calc.totalGastos;
     acc.autopista += calc.autopista;
     acc.empresa += calc.importeEmpresa;
@@ -1511,7 +1528,7 @@ function totalesMes(mes){
     acc.km += calc.kmJornada;
     acc.dias += 1;
     return acc;
-  }, { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, autopista:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
+  }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
   const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
   return { totals, extra: { servicios: serviciosTotal, gastosFijos: gastosFijosTotal } };
@@ -1548,7 +1565,7 @@ async function compartirPDFMensual(){
 
 function totalesAnio(year){
   const byMonth = {};
-  const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, gastosVar:0, gastosFijos:0, autopista:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
+  const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, gastosFijos:0, autopista:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
   state.cierres.forEach(d => {
     const k = monthKey(d.fecha);
     if(!k.startsWith(year)) return;
@@ -1557,6 +1574,7 @@ function totalesAnio(year){
     m.facturado += calc.facturado;
     m.efectivo += calc.efectivo;
     m.efectivoEmpresa += calc.efectivoEmpresa;
+    m.cardServicios += calc.cardServicios;
     m.gastosVar += calc.totalGastos;
     m.autopista += calc.autopista;
     m.empresa += calc.importeEmpresa;
@@ -1575,7 +1593,7 @@ function totalesAnio(year){
   const totals = months.reduce((acc,m)=>{
     Object.keys(acc).forEach(key => acc[key] += byMonth[m][key]);
     return acc;
-  }, {facturado:0,efectivo:0,efectivoEmpresa:0,gastosVar:0,gastosFijos:0,autopista:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
+  }, {facturado:0,efectivo:0,efectivoEmpresa:0,cardServicios:0,gastosVar:0,gastosFijos:0,autopista:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
   return { totals, extra: { servicios: totals.servicios, gastosFijos: totals.gastosFijos } };
 }
 

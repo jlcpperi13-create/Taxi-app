@@ -596,6 +596,10 @@ function renderCierreTab(c){
         <div class="meter-cell"><div class="label">Gastos tarjeta</div><div class="value mono" id="calc-gastos-tarjeta" style="font-size:14px;">€${fmt(calc.gastosDetalle.tarjeta)}</div></div>
         <div class="meter-cell"><div class="label">Otros gastos</div><div class="value mono" id="calc-gastos-otros" style="font-size:14px;">€${fmt(calc.gastosDetalle.otros)}</div></div>
       </div>
+      <div class="row2" style="margin-top:10px;">
+        <div class="meter-cell"><div class="label">Autopista (efectivo)</div><div class="value mono" id="calc-gastos-autopista-efectivo" style="font-size:14px;">€${fmt(calc.gastosDetalle.autopistaEfectivo)}</div></div>
+        <div class="meter-cell"><div class="label">Autopista (tarjeta)</div><div class="value mono" id="calc-gastos-autopista-tarjeta" style="font-size:14px;">€${fmt(calc.gastosDetalle.autopistaTarjeta)}</div></div>
+      </div>
       <button class="btn btn-ghost" style="margin-top:10px; font-size:13px;" id="btn-goto-gastos" onclick="gotoGastosFor('${d.fecha}')">+ Anotar gasto de este día</button>
     </div>
 
@@ -709,6 +713,10 @@ function liveCalc(){
   document.getElementById('calc-gastos-gasolina').textContent = `€${fmt(calc.gastosDetalle.gasolina)}`;
   document.getElementById('calc-gastos-tarjeta').textContent = `€${fmt(calc.gastosDetalle.tarjeta)}`;
   document.getElementById('calc-gastos-otros').textContent = `€${fmt(calc.gastosDetalle.otros)}`;
+  const autopistaEfEl = document.getElementById('calc-gastos-autopista-efectivo');
+  if(autopistaEfEl) autopistaEfEl.textContent = `€${fmt(calc.gastosDetalle.autopistaEfectivo)}`;
+  const autopistaTjEl = document.getElementById('calc-gastos-autopista-tarjeta');
+  if(autopistaTjEl) autopistaTjEl.textContent = `€${fmt(calc.gastosDetalle.autopistaTarjeta)}`;
   document.getElementById('calc-empresa').textContent = `€${fmt(calc.importeEmpresa)}`;
   document.getElementById('calc-chofer').textContent = `€${fmt(calc.importeChofer)}`;
   const propinasEl = document.getElementById('calc-propinas');

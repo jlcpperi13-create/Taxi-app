@@ -661,6 +661,7 @@ function archivedServicioRowHTML(s){
     <div class="entry-tags">
       <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
       <span class="tag">${s.pago}</span>
+      ${s.descuentoPct ? `<span class="tag">-${fmt(s.descuentoPct)}%</span>` : ''}
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
     </div>
   </div>`;
@@ -941,7 +942,9 @@ function renderServiciosTab(c){
   });
   const months = Object.keys(grouped).sort().reverse();
   const editing = state.editingServicioId ? state.servicios.find(x=>x.id===state.editingServicioId) : null;
-  const s = editing || { fecha: state.workDate || todayISO(), taxi:'', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag' };
+  const s = editing
+    ? { ...editing, importe: (editing.precioBase != null ? editing.precioBase : editing.importe), descuentoPct: editing.descuentoPct || '' }
+    : { fecha: state.workDate || todayISO(), taxi:'', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag', descuentoPct:'' };
 
   c.innerHTML = `
     <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${state.servicios.length} registrados</span></div>
@@ -957,14 +960,19 @@ function renderServiciosTab(c){
         <div><label>Destino</label><input type="text" id="s-destino" value="${s.destino}" placeholder="Punto de destino"></div>
       </div>
       <div class="row2 field">
-        <div><label>Importe (€)</label><input type="number" step="0.01" id="s-importe" value="${s.importe}" placeholder="0.00"></div>
-        <div><label>Forma de pago</label>
-          <select id="s-pago">
-            <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
-            <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
-            <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
-          </select>
-        </div>
+        <div><label>Importe (€)</label><input type="number" step="0.01" id="s-importe" value="${s.importe}" placeholder="0.00" oninput="previewDescuento()"></div>
+        <div><label>Descuento (%)</label><input type="number" step="0.01" id="s-descuento" value="${s.descuentoPct}" placeholder="0" oninput="previewDescuento()"></div>
+      </div>
+      <div class="field" id="descuento-preview-wrap" style="display:${s.descuentoPct ? 'block':'none'}; margin-top:-6px;">
+        <div class="notice" id="descuento-preview">Importe final: €${fmt(round2((+s.importe||0) * (1 - (+s.descuentoPct||0)/100)))}</div>
+      </div>
+      <div class="field">
+        <label>Forma de pago</label>
+        <select id="s-pago">
+          <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
+          <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
+          <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
+        </select>
       </div>
       <div class="btn-row">
         ${editing ? `<button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button>` : ''}
@@ -1009,12 +1017,29 @@ function servicioRowHTML(s){
     <div class="entry-tags">
       <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
       <span class="tag">${s.pago}</span>
+      ${s.descuentoPct ? `<span class="tag">-${fmt(s.descuentoPct)}%</span>` : ''}
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
     </div>
   </div>`;
 }
 
 function editServicio(id){ state.editingServicioId = id; render(); window.scrollTo(0,0); }
+
+function previewDescuento(){
+  const importeEl = document.getElementById('s-importe');
+  const descuentoEl = document.getElementById('s-descuento');
+  const wrap = document.getElementById('descuento-preview-wrap');
+  const preview = document.getElementById('descuento-preview');
+  if(!importeEl || !descuentoEl || !wrap || !preview) return;
+  const base = +importeEl.value || 0;
+  const pct = +descuentoEl.value || 0;
+  if(pct > 0 && base > 0){
+    wrap.style.display = 'block';
+    preview.textContent = `Importe final: €${fmt(round2(base * (1 - pct/100)))}`;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
 
 async function saveServicio(id){
   const fecha = document.getElementById('s-fecha').value || todayISO();
@@ -1023,13 +1048,18 @@ async function saveServicio(id){
   const cliente = document.getElementById('s-cliente').value.trim();
   const pago = document.getElementById('s-pago').value;
   const propinaVal = document.getElementById('s-propina').value;
+  const descuentoPct = round2(document.getElementById('s-descuento').value || 0);
+  const precioBase = round2(importeVal);
+  const importeFinal = round2(precioBase * (1 - descuentoPct/100));
   const s = {
     id: id || uid(),
     fecha,
     cliente,
     origen: document.getElementById('s-origen').value.trim(),
     destino: document.getElementById('s-destino').value.trim(),
-    importe: round2(importeVal),
+    precioBase,
+    descuentoPct,
+    importe: importeFinal,
     pago,
     propina: pago !== 'efectivo' && propinaVal ? round2(propinaVal) : '',
     estado: document.getElementById('s-estado').value,

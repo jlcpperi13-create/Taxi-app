@@ -398,14 +398,14 @@ function cierreCalc(d){
   const propinas = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.propina||0), 0));
   const gastos = summarizeGastos(gastosDeCierre(d));
   const gastosEfectivo = round2(gastos.gasolina + gastos.otros);
-  const efectivo = round2(facturado - cardServicios - gastosEfectivo - gastos.autopistaTarjeta);
+  const efectivo = round2(facturado - cardServicios - gastosEfectivo + gastos.autopistaTarjeta);
   const kmJornada = Math.max(0, kmFin - kmInicio);
   const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
   const pct = (+d.pctEmpresa || state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = round2(choferBase + propinas);
-  const efectivoEmpresa = round2(efectivo - importeChofer + gastos.autopista);
+  const efectivoEmpresa = round2(efectivo - importeChofer + gastos.autopistaEfectivo - gastos.autopistaTarjeta);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta);
   return { facturado, cardServicios, tarjetaBoxTotal, propinas, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
 }

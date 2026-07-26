@@ -577,8 +577,8 @@ function renderCierreTab(c){
         <div class="meter-cell"><div class="label">Tarjeta/TPV/Transf.</div><div class="value mono" id="calc-tarjeta" style="font-size:14px;">−€${fmt(calc.tarjetaBoxTotal)}</div></div>
       </div>
       <div class="meter-cell" style="margin-top:10px;">
-        <div class="label">Cobrado tarjeta/transf. (servicios)</div>
-        <div class="value mono" id="calc-tarjeta-servicios" style="font-size:14px;">€${fmt(calc.cardServicios)}</div>
+        <div class="label">Cobrado tarjeta/transf. (+ autopista tarjeta)</div>
+        <div class="value mono" id="calc-tarjeta-servicios" style="font-size:14px;">€${fmt(calc.tarjetaBoxTotal)}</div>
       </div>
       <div class="meter-cell teal" style="margin-top:10px;">
         <div class="label">Efectivo de empresa</div>
@@ -713,7 +713,7 @@ function liveCalc(){
   document.getElementById('calc-efectivo').textContent = `€${fmt(calc.efectivo)}`;
   document.getElementById('calc-tarjeta').textContent = `−€${fmt(calc.tarjetaBoxTotal)}`;
   const tarjetaServEl = document.getElementById('calc-tarjeta-servicios');
-  if(tarjetaServEl) tarjetaServEl.textContent = `€${fmt(calc.cardServicios)}`;
+  if(tarjetaServEl) tarjetaServEl.textContent = `€${fmt(calc.tarjetaBoxTotal)}`;
   document.getElementById('calc-efectivo-empresa').textContent = `€${fmt(calc.efectivoEmpresa)}`;
   document.getElementById('calc-km').textContent = `${fmt(calc.kmJornada)}`;
   document.getElementById('calc-euros-km').textContent = `€${fmt(calc.eurosPorKm)}`;
@@ -1309,7 +1309,7 @@ function renderMensualTab(c){
     acc.facturado += calc.facturado;
     acc.efectivo += calc.efectivo;
     acc.efectivoEmpresa += calc.efectivoEmpresa;
-    acc.cardServicios += calc.cardServicios;
+    acc.cardServicios += calc.tarjetaBoxTotal;
     acc.gastosVar += calc.totalGastos;
     acc.autopista += calc.autopista;
     acc.gasolina += calc.gastosDetalle.gasolina;
@@ -1350,7 +1350,7 @@ function renderMensualTab(c){
         <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
       </div>
       <div class="meter-cell" style="margin-bottom:10px;">
-        <div class="label">Cobrado tarjeta/transf. (servicios)</div>
+        <div class="label">Cobrado tarjeta/transf. (+ autopista tarjeta)</div>
         <div class="value mono" style="font-size:14px;">€${fmt(totals.cardServicios)}</div>
       </div>
       <div class="meter-cell teal">
@@ -1422,7 +1422,7 @@ function renderAnualTab(c){
     m.facturado += calc.facturado;
     m.efectivo += calc.efectivo;
     m.efectivoEmpresa += calc.efectivoEmpresa;
-    m.cardServicios += calc.cardServicios;
+    m.cardServicios += calc.tarjetaBoxTotal;
     m.gastosVar += calc.totalGastos;
     m.autopista += calc.autopista;
     m.gasolina += calc.gastosDetalle.gasolina;
@@ -1470,7 +1470,7 @@ function renderAnualTab(c){
           <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
         </div>
         <div class="meter-cell" style="margin-bottom:10px;">
-          <div class="label">Cobrado tarjeta/transf. (servicios)</div>
+          <div class="label">Cobrado tarjeta/transf. (+ autopista tarjeta)</div>
           <div class="value mono" style="font-size:14px;">€${fmt(totals.cardServicios)}</div>
         </div>
         <div class="meter-cell teal">
@@ -1582,7 +1582,7 @@ function seccionesDesdeTotales(totals, extra){
     { heading:'Resultado', rows:[
       ['Facturado', `€${fmt(totals.facturado)}`],
       ['Efectivo', `€${fmt(totals.efectivo)}`],
-      ['Cobrado tarjeta/transf. (servicios)', `€${fmt(totals.cardServicios)}`],
+      ['Cobrado tarjeta/transf. (+ autopista tarjeta)', `€${fmt(totals.cardServicios)}`],
       ['Efectivo de empresa', `€${fmt(totals.efectivoEmpresa)}`],
     ]},
     { heading:'Reparto', rows:[
@@ -1617,7 +1617,7 @@ function totalesMes(mes){
     acc.facturado += calc.facturado;
     acc.efectivo += calc.efectivo;
     acc.efectivoEmpresa += calc.efectivoEmpresa;
-    acc.cardServicios += calc.cardServicios;
+    acc.cardServicios += calc.tarjetaBoxTotal;
     acc.gastosVar += calc.totalGastos;
     acc.autopista += calc.autopista;
     acc.gasolina += calc.gastosDetalle.gasolina;
@@ -1677,7 +1677,7 @@ function totalesAnio(year){
     m.facturado += calc.facturado;
     m.efectivo += calc.efectivo;
     m.efectivoEmpresa += calc.efectivoEmpresa;
-    m.cardServicios += calc.cardServicios;
+    m.cardServicios += calc.tarjetaBoxTotal;
     m.gastosVar += calc.totalGastos;
     m.autopista += calc.autopista;
     m.gasolina += calc.gastosDetalle.gasolina;

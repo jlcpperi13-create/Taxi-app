@@ -994,23 +994,26 @@ function renderServiciosTab(c){
       <div class="field" id="descuento-preview-wrap" style="display:${s.descuentoPct ? 'block':'none'}; margin-top:-6px;">
         <div class="notice" id="descuento-preview">Importe final: €${fmt(round2((+s.importe||0) * (1 - (+s.descuentoPct||0)/100)))}</div>
       </div>
-      <div class="field">
-        <label>Forma de pago</label>
-        <select id="s-pago" onchange="toggleAutopistaIncluida()">
-          <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
-          <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
-          <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
-        </select>
+      <div class="row2 field">
+        <div>
+          <label>Forma de pago</label>
+          <select id="s-pago" onchange="toggleAutopistaIncluida()">
+            <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
+            <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
+            <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" style="width:100%;" onclick="saveServicio(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Añadir servicio'}</button>
+        </div>
       </div>
       <div class="field" id="autopista-incluida-wrap" style="display:${s.pago!=='efectivo' ? 'block':'none'};">
         <label>Autopista incluida en este cobro (€)</label>
         <input type="number" step="0.01" id="s-autopista-incluida" value="${s.autopistaIncluida || ''}" placeholder="0.00">
         <div class="notice" style="margin-top:6px;">Si el peaje fue cobrado junto con la carrera por tarjeta/transferencia, ponlo aquí. No se suma al importe del servicio (el reparto empresa/chofer sigue calculándose solo sobre la carrera), pero sí se descuenta del Efectivo y cuenta como Autopista con tarjeta.</div>
       </div>
-      <div class="btn-row">
-        ${editing ? `<button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button>` : ''}
-        <button class="btn btn-primary" onclick="saveServicio(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Añadir servicio'}</button>
-      </div>
+      ${editing ? `<div class="btn-row"><button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button></div>` : ''}
       ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingServicioId=null; render();">Cancelar</button>` : ''}
       <div class="field" style="margin-top:14px;"><label>Propina / redondeo cobrado de más (€)</label><input type="number" step="0.01" id="s-propina" value="${s.propina || ''}" placeholder="0.00"></div>
       <div class="notice" style="margin-top:-2px;">Solo aplica si se pagó con tarjeta o transferencia y el cobro fue superior al importe del servicio. Va 100% para el chofer y no se reparte con la empresa.</div>

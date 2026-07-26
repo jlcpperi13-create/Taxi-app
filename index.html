@@ -397,6 +397,9 @@ function cierreCalc(d){
   const cardServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.importe||0), 0));
   const propinas = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.propina||0), 0));
   const gastos = summarizeGastos(gastosDeCierre(d));
+  const autopistaEnServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.autopistaIncluida||0), 0));
+  gastos.autopistaTarjeta = round2(gastos.autopistaTarjeta + autopistaEnServicios);
+  gastos.autopista = round2(gastos.autopistaEfectivo + gastos.autopistaTarjeta);
   const gastosEfectivo = round2(gastos.gasolina + gastos.otros);
   const efectivo = round2(facturado - cardServicios - gastosEfectivo - gastos.autopistaTarjeta);
   const kmJornada = Math.max(0, kmFin - kmInicio);
@@ -669,6 +672,7 @@ function archivedServicioRowHTML(s){
       <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
       <span class="tag">${s.pago}</span>
       ${s.descuentoPct ? `<span class="tag">-${fmt(s.descuentoPct)}%</span>` : ''}
+      ${s.autopistaIncluida ? `<span class="tag">+autopista €${fmt(s.autopistaIncluida)}</span>` : ''}
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
     </div>
   </div>`;
@@ -986,11 +990,16 @@ function renderServiciosTab(c){
       </div>
       <div class="field">
         <label>Forma de pago</label>
-        <select id="s-pago">
+        <select id="s-pago" onchange="toggleAutopistaIncluida()">
           <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
           <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
           <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
         </select>
+      </div>
+      <div class="field" id="autopista-incluida-wrap" style="display:${s.pago!=='efectivo' ? 'block':'none'};">
+        <label>Autopista incluida en este cobro (€)</label>
+        <input type="number" step="0.01" id="s-autopista-incluida" value="${s.autopistaIncluida || ''}" placeholder="0.00">
+        <div class="notice" style="margin-top:6px;">Si el peaje fue cobrado junto con la carrera por tarjeta/transferencia, ponlo aquí. No se suma al importe del servicio (el reparto empresa/chofer sigue calculándose solo sobre la carrera), pero sí se descuenta del Efectivo y cuenta como Autopista con tarjeta.</div>
       </div>
       <div class="btn-row">
         ${editing ? `<button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button>` : ''}
@@ -1036,12 +1045,19 @@ function servicioRowHTML(s){
       <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
       <span class="tag">${s.pago}</span>
       ${s.descuentoPct ? `<span class="tag">-${fmt(s.descuentoPct)}%</span>` : ''}
+      ${s.autopistaIncluida ? `<span class="tag">+autopista €${fmt(s.autopistaIncluida)}</span>` : ''}
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
     </div>
   </div>`;
 }
 
 function editServicio(id){ state.editingServicioId = id; render(); window.scrollTo(0,0); }
+
+function toggleAutopistaIncluida(){
+  const pago = document.getElementById('s-pago').value;
+  const wrap = document.getElementById('autopista-incluida-wrap');
+  if(wrap) wrap.style.display = pago !== 'efectivo' ? 'block' : 'none';
+}
 
 function previewDescuento(){
   const importeEl = document.getElementById('s-importe');
@@ -1069,6 +1085,8 @@ async function saveServicio(id){
   const descuentoPct = round2(document.getElementById('s-descuento').value || 0);
   const precioBase = round2(importeVal);
   const importeFinal = round2(precioBase * (1 - descuentoPct/100));
+  const autopistaIncluidaEl = document.getElementById('s-autopista-incluida');
+  const autopistaIncluida = (pago !== 'efectivo' && autopistaIncluidaEl && autopistaIncluidaEl.value) ? round2(autopistaIncluidaEl.value) : '';
   const s = {
     id: id || uid(),
     fecha,
@@ -1079,6 +1097,7 @@ async function saveServicio(id){
     descuentoPct,
     importe: importeFinal,
     pago,
+    autopistaIncluida,
     propina: pago !== 'efectivo' && propinaVal ? round2(propinaVal) : '',
     estado: document.getElementById('s-estado').value,
     taxi: document.getElementById('s-taxi').value.trim(),

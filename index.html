@@ -192,9 +192,11 @@ function lsSet(key, value){
 const CAT_DIARIO = [
   {id:'gasolina', label:'Gasolina'},
   {id:'autopista', label:'Autopista'},
-  {id:'autopista_tarjeta', label:'Autopista (tarjeta)'},
   {id:'tarjeta', label:'Tarjeta / TPV'},
   {id:'otros', label:'Otros'},
+];
+const CAT_DIARIO_LEGACY = [
+  {id:'autopista_tarjeta', label:'Autopista (tarjeta)'},
 ];
 const CAT_PERIODICO = [
   {id:'seguro', label:'Seguro'},
@@ -229,6 +231,7 @@ let state = {
   skipPrefill: false,
   mesActual: null,
   workDate: null,
+  lastTaxi: '',
 };
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -267,6 +270,7 @@ async function loadData(){
       if(parsed.driver) state.driver = parsed.driver;
       if(parsed.pctEmpresa) state.pctEmpresa = parsed.pctEmpresa;
       if(Array.isArray(parsed.tiposMantenimiento) && parsed.tiposMantenimiento.length) state.tiposMantenimiento = parsed.tiposMantenimiento;
+      if(parsed.lastTaxi) state.lastTaxi = parsed.lastTaxi;
     }
   }catch(e){ /* keep defaults */ }
   if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
@@ -295,7 +299,7 @@ async function saveMantenimientos(){
   catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
 }
 async function saveConfig(){
-  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, tiposMantenimiento: state.tiposMantenimiento })); }
+  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, tiposMantenimiento: state.tiposMantenimiento, lastTaxi: state.lastTaxi })); }
   catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
 }
 
@@ -617,7 +621,7 @@ function renderCierreTab(c){
     <div class="card">
       <div class="subhead">Gastos de este cierre (${editing.gastosArchivados.length})</div>
       <div class="notice" style="margin-bottom:10px;">Estos gastos quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Gastos.</div>
-      ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_PERIODICO])).join('')}
+      ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO])).join('')}
     </div>` : ''}
 
     <div class="btn-row">
@@ -819,7 +823,9 @@ async function deleteCierre(id){
 function renderGastosTab(c){
   const editing = state.editingGastoId ? state.gastos.find(x=>x.id===state.editingGastoId) : null;
   const tipo = editing ? editing.tipo : state.gastoTipo;
-  const cats = tipo === 'diario' ? CAT_DIARIO : CAT_PERIODICO;
+  const cats = tipo === 'diario'
+    ? (editing && CAT_DIARIO_LEGACY.some(c=>c.id===editing.categoria) ? [...CAT_DIARIO, ...CAT_DIARIO_LEGACY] : CAT_DIARIO)
+    : CAT_PERIODICO;
   const prefillFecha = state.gastoPrefillFecha || state.workDate || todayISO();
   const g = editing || { fecha: prefillFecha, categoria: cats[0].id, importe: '', nota: '' };
   const list = state.gastos.filter(x => x.tipo === tipo);
@@ -839,7 +845,7 @@ function renderGastosTab(c){
           <div class="month-total mono">€${fmt(total)}</div>
         </div>
         <div class="card" style="padding:4px 16px;">
-          ${grouped[fe].map(x => gastoRowHTML(x, CAT_DIARIO)).join('')}
+          ${grouped[fe].map(x => gastoRowHTML(x, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY])).join('')}
         </div>`;
       }).join('');
   } else {
@@ -966,7 +972,7 @@ function renderServiciosTab(c){
   const editing = state.editingServicioId ? state.servicios.find(x=>x.id===state.editingServicioId) : null;
   const s = editing
     ? { ...editing, importe: (editing.precioBase != null ? editing.precioBase : editing.importe), descuentoPct: editing.descuentoPct || '' }
-    : { fecha: state.workDate || todayISO(), taxi:'', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag', descuentoPct:'' };
+    : { fecha: state.workDate || todayISO(), taxi: state.lastTaxi || '', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag', descuentoPct:'' };
 
   c.innerHTML = `
     <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${state.servicios.length} registrados</span></div>
@@ -974,7 +980,7 @@ function renderServiciosTab(c){
     <div class="card">
       <div class="row2 field">
         <div><label>Fecha</label><input type="date" id="s-fecha" value="${s.fecha}"></div>
-        <div><label>Nº taxi</label><input type="text" id="s-taxi" value="${s.taxi}" placeholder="29"></div>
+        <div><label>Nº taxi</label><input type="text" id="s-taxi" value="${s.taxi}" placeholder="Nº de taxi"></div>
       </div>
       <div class="field"><label>Cliente (opcional)</label><input type="text" id="s-cliente" value="${s.cliente}" placeholder="Nombre del cliente"></div>
       <div class="row2 field">
@@ -1109,6 +1115,7 @@ async function saveServicio(id){
   } else {
     state.servicios.push(s);
   }
+  if(s.taxi && s.taxi !== state.lastTaxi){ state.lastTaxi = s.taxi; await saveConfig(); }
   state.editingServicioId = null;
   await saveServicios();
   showToast(id ? 'Servicio actualizado' : 'Servicio añadido');

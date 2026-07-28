@@ -1397,9 +1397,9 @@ function renderMensualTab(c){
       <div class="subhead">Reparto</div>
       <div class="row2">
         <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
-        <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer - totals.propinas)}</div></div>
+        <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
       </div>
-      ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Propinas/redondeo aparte (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+      ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
     </div>
 
     <div class="card">
@@ -1517,9 +1517,9 @@ function renderAnualTab(c){
         <div class="subhead">Reparto</div>
         <div class="row2">
           <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
-          <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer - totals.propinas)}</div></div>
+          <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
         </div>
-        ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Propinas/redondeo aparte (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+        ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
       </div>
 
       <div class="card">
@@ -1621,7 +1621,7 @@ function seccionesDesdeTotales(totals, extra){
     ]},
     { heading:'Reparto', rows:[
       ['Empresa', `€${fmt(totals.empresa)}`],
-      ['Chofer', `€${fmt(totals.chofer - totals.propinas)}`],
+      ['Chofer', `€${fmt(totals.chofer)}`],
       ...(totals.propinas ? [['Propinas/redondeo (chofer)', `€${fmt(totals.propinas)}`]] : []),
     ]},
     { heading:'Gastos y servicios', rows:[

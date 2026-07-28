@@ -144,6 +144,11 @@ input,select{font-family:inherit;}
 .driver-pill button.active{border-color:var(--amber); color:var(--amber);}
 
 .notice{background:rgba(255,176,32,0.08); border:1px solid var(--amber-dim); border-radius:10px; padding:10px 12px; font-size:12px; color:var(--muted); margin-bottom:14px; line-height:1.4;}
+.notice-toggle{margin-bottom:14px;}
+.notice-toggle summary{cursor:pointer; font-size:12px; color:var(--amber); list-style:none; display:flex; align-items:center; gap:5px; padding:2px 0; user-select:none;}
+.notice-toggle summary::-webkit-details-marker{display:none;}
+.notice-toggle summary::before{content:"ⓘ"; font-size:13px;}
+.notice-toggle .notice{margin:6px 0 0 0;}
 .subhead{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px; font-weight:600;}
 .loading{text-align:center; padding:30px; color:var(--muted); font-size:13px;}
 </style>
@@ -540,7 +545,7 @@ function renderCierreTab(c){
   const calc = cierreCalc(d);
 
   c.innerHTML = `
-    ${!editing ? '<div class="notice">Datos guardados solo en este navegador/dispositivo. Si cambias de móvil o borras datos de navegación, se pierden — usa "Copia de seguridad" en Ajustes para exportarlos.</div>' : ''}
+    ${!editing ? '<details class="notice-toggle"><summary>Info</summary><div class="notice">Datos guardados solo en este navegador/dispositivo. Si cambias de móvil o borras datos de navegación, se pierden — usa "Copia de seguridad" en Ajustes para exportarlos.</div></details>' : ''}
     <div class="section-title">${editing ? 'Editar cierre' : 'Nuevo cierre'}<span class="sub">${state.cierres.length} días registrados</span></div>
     ${driverPillHTML()}
 
@@ -613,14 +618,14 @@ function renderCierreTab(c){
     ${editing && Array.isArray(editing.serviciosArchivados) && editing.serviciosArchivados.length ? `
     <div class="card">
       <div class="subhead">Servicios de este cierre (${editing.serviciosArchivados.length})</div>
-      <div class="notice" style="margin-bottom:10px;">Estos servicios quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Servicios.</div>
+      <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos servicios quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Servicios.</div></details>
       ${editing.serviciosArchivados.map(archivedServicioRowHTML).join('')}
     </div>` : ''}
 
     ${editing && Array.isArray(editing.gastosArchivados) && editing.gastosArchivados.length ? `
     <div class="card">
       <div class="subhead">Gastos de este cierre (${editing.gastosArchivados.length})</div>
-      <div class="notice" style="margin-bottom:10px;">Estos gastos quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Gastos.</div>
+      <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos gastos quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Gastos.</div></details>
       ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO])).join('')}
     </div>` : ''}
 
@@ -874,7 +879,7 @@ function renderGastosTab(c){
       <button class="${tipo==='periodico'?'active':''}" ${editing ? '' : `onclick="setGastoTipo('periodico')"`}>Periódico</button>
     </div>
     <div class="card">
-      ${tipo === 'diario' ? '<div class="notice">Se suma automáticamente al cierre de la fecha elegida.</div>' : '<div class="notice">No afecta al cierre diario, pero cuenta como gasto fijo en el resumen anual.</div>'}
+      ${tipo === 'diario' ? '<details class="notice-toggle"><summary>Info</summary><div class="notice">Se suma automáticamente al cierre de la fecha elegida.</div></details>' : '<details class="notice-toggle"><summary>Info</summary><div class="notice">No afecta al cierre diario, pero cuenta como gasto fijo en el resumen anual.</div></details>'}
       <div class="field"><label>Fecha</label><input type="date" id="g-fecha" value="${g.fecha}"></div>
       <div class="field"><label>Categoría</label>
         ${tipo === 'periodico' ? `
@@ -1011,12 +1016,12 @@ function renderServiciosTab(c){
       <div class="field" id="autopista-incluida-wrap" style="display:${s.pago!=='efectivo' ? 'block':'none'};">
         <label>Autopista incluida en este cobro (€)</label>
         <input type="number" step="0.01" id="s-autopista-incluida" value="${s.autopistaIncluida || ''}" placeholder="0.00">
-        <div class="notice" style="margin-top:6px;">Si el peaje fue cobrado junto con la carrera por tarjeta/transferencia, ponlo aquí. No se suma al importe del servicio (el reparto empresa/chofer sigue calculándose solo sobre la carrera), pero sí se descuenta del Efectivo y cuenta como Autopista con tarjeta.</div>
+        <details class="notice-toggle" style="margin-top:6px;"><summary>Info</summary><div class="notice">Si el peaje fue cobrado junto con la carrera por tarjeta/transferencia, ponlo aquí. No se suma al importe del servicio (el reparto empresa/chofer sigue calculándose solo sobre la carrera), pero sí se descuenta del Efectivo y cuenta como Autopista con tarjeta.</div></details>
       </div>
       ${editing ? `<div class="btn-row"><button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button></div>` : ''}
       ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingServicioId=null; render();">Cancelar</button>` : ''}
       <div class="field" style="margin-top:14px;"><label>Propina / redondeo cobrado de más (€)</label><input type="number" step="0.01" id="s-propina" value="${s.propina || ''}" placeholder="0.00"></div>
-      <div class="notice" style="margin-top:-2px;">Solo aplica si se pagó con tarjeta o transferencia y el cobro fue superior al importe del servicio. Va 100% para el chofer y no se reparte con la empresa.</div>
+      <details class="notice-toggle" style="margin-top:-2px;"><summary>Info</summary><div class="notice">Solo aplica si se pagó con tarjeta o transferencia y el cobro fue superior al importe del servicio. Va 100% para el chofer y no se reparte con la empresa.</div></details>
       <div class="field"><label>Estado</label>
         <select id="s-estado">
           <option value="pag" ${s.estado==='pag'?'selected':''}>Pagado</option>
@@ -1169,7 +1174,7 @@ function renderMantenimientoTab(c){
         <div><label>Coste (€)</label><input type="number" step="0.01" id="mt-coste" value="${m.coste}" placeholder="0.00"></div>
         <div><label>Taller / proveedor</label><input type="text" id="mt-taller" value="${m.taller||''}" placeholder="Nombre del taller"></div>
       </div>
-      <div class="notice">Próximo aviso opcional: por fecha, por km, o ambos. Avisamos 30 días o 1.000 km antes.</div>
+      <details class="notice-toggle"><summary>Info</summary><div class="notice">Próximo aviso opcional: por fecha, por km, o ambos. Avisamos 30 días o 1.000 km antes.</div></details>
       <div class="row2 field">
         <div><label>Próximo aviso (fecha)</label><input type="date" id="mt-proximaFecha" value="${m.proximoFecha||''}"></div>
         <div><label>Próximo aviso (km)</label><input type="number" id="mt-proximoKm" value="${m.proximoKm||''}" placeholder="Ej. 120000"></div>
@@ -1392,9 +1397,9 @@ function renderMensualTab(c){
       <div class="subhead">Reparto</div>
       <div class="row2">
         <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
-        <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
+        <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer - totals.propinas)}</div></div>
       </div>
-      ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+      ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Propinas/redondeo aparte (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
     </div>
 
     <div class="card">
@@ -1512,9 +1517,9 @@ function renderAnualTab(c){
         <div class="subhead">Reparto</div>
         <div class="row2">
           <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
-          <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
+          <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer - totals.propinas)}</div></div>
         </div>
-        ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+        ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Propinas/redondeo aparte (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
       </div>
 
       <div class="card">
@@ -1616,7 +1621,7 @@ function seccionesDesdeTotales(totals, extra){
     ]},
     { heading:'Reparto', rows:[
       ['Empresa', `€${fmt(totals.empresa)}`],
-      ['Chofer', `€${fmt(totals.chofer)}`],
+      ['Chofer', `€${fmt(totals.chofer - totals.propinas)}`],
       ...(totals.propinas ? [['Propinas/redondeo (chofer)', `€${fmt(totals.propinas)}`]] : []),
     ]},
     { heading:'Gastos y servicios', rows:[
@@ -1766,7 +1771,7 @@ function renderAjustesTab(c){
   const bytes = new Blob([JSON.stringify(state.cierres)+JSON.stringify(state.servicios)+JSON.stringify(state.gastos)]).size;
   c.innerHTML = `
     <div class="section-title">Ajustes</div>
-    <div class="notice">Esta app guarda los datos solo en este navegador (localStorage), sin pasar por ningún servidor. Si borras datos de navegación, desinstalas el navegador o cambias de dispositivo, los datos se pierden. Haz copias de seguridad con regularidad.</div>
+    <details class="notice-toggle"><summary>Info</summary><div class="notice">Esta app guarda los datos solo en este navegador (localStorage), sin pasar por ningún servidor. Si borras datos de navegación, desinstalas el navegador o cambias de dispositivo, los datos se pierden. Haz copias de seguridad con regularidad.</div></details>
 
     <div class="card">
       <div class="subhead">Copia de seguridad</div>

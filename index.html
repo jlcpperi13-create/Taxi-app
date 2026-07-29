@@ -425,16 +425,19 @@ function serviciosDeFecha(fecha){
   const vivos = state.servicios.filter(s => s.fecha === fecha);
   return [...archivados, ...vivos];
 }
-function serviciosDeMes(mes){
+function serviciosDeMes(mes, chofer){
   const archivados = state.cierres
-    .filter(c => monthKey(c.fecha) === mes && Array.isArray(c.serviciosArchivados))
+    .filter(c => monthKey(c.fecha) === mes && (!chofer || c.chofer === chofer) && Array.isArray(c.serviciosArchivados))
     .flatMap(c => c.serviciosArchivados);
-  const vivos = state.servicios.filter(s => monthKey(s.fecha) === mes);
+  const vivos = state.servicios.filter(s => monthKey(s.fecha) === mes && (!chofer || s.chofer === chofer));
   return [...archivados, ...vivos];
 }
-function todosLosServicios(){
-  const archivados = state.cierres.flatMap(c => Array.isArray(c.serviciosArchivados) ? c.serviciosArchivados : []);
-  return [...archivados, ...state.servicios];
+function todosLosServicios(chofer){
+  const archivados = state.cierres
+    .filter(c => !chofer || c.chofer === chofer)
+    .flatMap(c => Array.isArray(c.serviciosArchivados) ? c.serviciosArchivados : []);
+  const vivos = state.servicios.filter(s => !chofer || s.chofer === chofer);
+  return [...archivados, ...vivos];
 }
 
 function cierreCalc(d){
@@ -1381,10 +1384,11 @@ function changeMes(delta){
 
 function renderMensualTab(c){
   const mes = state.mesActual || monthKey(todayISO());
-  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
-  const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
-  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
+  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes && d.chofer === state.driver).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosMes = serviciosDeMes(mes, state.driver).filter(s => s.estado !== 'anulado');
+  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes && g.chofer === state.driver);
 
+  const fechasUnicas = new Set();
   const totals = cierresMes.reduce((acc, d) => {
     const calc = cierreCalc(d);
     acc.facturado += calc.facturado;
@@ -1402,9 +1406,10 @@ function renderMensualTab(c){
     acc.chofer += calc.importeChofer;
     acc.propinas += calc.propinas;
     acc.km += calc.kmJornada;
-    acc.dias += 1;
+    fechasUnicas.add(d.fecha);
     return acc;
   }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
+  totals.dias = fechasUnicas.size;
 
   const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
@@ -1496,7 +1501,8 @@ function renderAnualTab(c){
   const byMonth = {};
   const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, gastosFijos:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
 
-  state.cierres.forEach(d => {
+  const fechasPorMes = {};
+  state.cierres.filter(d => d.chofer === state.driver).forEach(d => {
     const k = monthKey(d.fecha);
     const calc = cierreCalc(d);
     const m = ensure(k);
@@ -1515,13 +1521,14 @@ function renderAnualTab(c){
     m.chofer += calc.importeChofer;
     m.propinas += calc.propinas;
     m.km += calc.kmJornada;
-    m.dias += 1;
+    (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
-  state.gastos.filter(g => g.tipo === 'periodico').forEach(g => {
+  Object.keys(fechasPorMes).forEach(k => { ensure(k).dias = fechasPorMes[k].size; });
+  state.gastos.filter(g => g.tipo === 'periodico' && g.chofer === state.driver).forEach(g => {
     const k = monthKey(g.fecha);
     ensure(k).gastosFijos += (+g.importe || 0);
   });
-  todosLosServicios().filter(s => s.estado !== 'anulado').forEach(s => {
+  todosLosServicios(state.driver).filter(s => s.estado !== 'anulado').forEach(s => {
     const k = monthKey(s.fecha);
     ensure(k).servicios += (+s.importe || 0);
   });
@@ -1740,9 +1747,10 @@ function seccionesDesdeTotales(totals, extra){
 }
 
 function totalesMes(mes){
-  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
-  const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
-  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
+  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes && d.chofer === state.driver).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosMes = serviciosDeMes(mes, state.driver).filter(s => s.estado !== 'anulado');
+  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes && g.chofer === state.driver);
+  const fechasUnicas = new Set();
   const totals = cierresMes.reduce((acc, d) => {
     const calc = cierreCalc(d);
     acc.facturado += calc.facturado;
@@ -1760,9 +1768,10 @@ function totalesMes(mes){
     acc.chofer += calc.importeChofer;
     acc.propinas += calc.propinas;
     acc.km += calc.kmJornada;
-    acc.dias += 1;
+    fechasUnicas.add(d.fecha);
     return acc;
   }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
+  totals.dias = fechasUnicas.size;
   const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
   return { totals, extra: { servicios: serviciosTotal, gastosFijos: gastosFijosTotal } };
@@ -1799,8 +1808,9 @@ async function compartirPDFMensual(){
 
 function totalesAnio(year){
   const byMonth = {};
+  const fechasPorMes = {};
   const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, gastosFijos:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
-  state.cierres.forEach(d => {
+  state.cierres.filter(d => d.chofer === state.driver).forEach(d => {
     const k = monthKey(d.fecha);
     if(!k.startsWith(year)) return;
     const calc = cierreCalc(d);
@@ -1820,12 +1830,13 @@ function totalesAnio(year){
     m.chofer += calc.importeChofer;
     m.propinas += calc.propinas;
     m.km += calc.kmJornada;
-    m.dias += 1;
+    (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
-  state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha).startsWith(year)).forEach(g => {
+  Object.keys(fechasPorMes).forEach(k => { ensure(k).dias = fechasPorMes[k].size; });
+  state.gastos.filter(g => g.tipo === 'periodico' && g.chofer === state.driver && monthKey(g.fecha).startsWith(year)).forEach(g => {
     ensure(monthKey(g.fecha)).gastosFijos += (+g.importe || 0);
   });
-  todosLosServicios().filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
+  todosLosServicios(state.driver).filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
     ensure(monthKey(s.fecha)).servicios += (+s.importe || 0);
   });
   const months = Object.keys(byMonth).sort();

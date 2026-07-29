@@ -1631,18 +1631,28 @@ function buildClosingPDF(title, subtitle, sections, cards){
 
   sections.forEach(section => {
     if(y > 760){ doc.addPage(); y = 50; }
+    const col = section.color || [30,30,30];
+    doc.setFillColor(col[0], col[1], col[2]);
+    doc.rect(marginX, y - 10, 3, 14, 'F');
+    doc.setTextColor(col[0], col[1], col[2]);
     doc.setFont('helvetica','bold');
     doc.setFontSize(13);
-    doc.text(section.heading, marginX, y);
+    doc.text(section.heading, marginX + 10, y);
+    doc.setTextColor(0);
     y += 18;
     doc.setFont('helvetica','normal');
     doc.setFontSize(11);
     section.rows.forEach(([label, value]) => {
       if(y > 780){ doc.addPage(); y = 50; }
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(60);
       doc.text(String(label), marginX, y);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(col[0], col[1], col[2]);
       doc.text(String(value), 400, y, { align:'right' });
       y += 16;
     });
+    doc.setTextColor(0);
     y += 14;
   });
 
@@ -1654,18 +1664,17 @@ function buildClosingPDF(title, subtitle, sections, cards){
 
 function seccionesDesdeTotales(totals, extra){
   return [
-    { heading:'Resultado', rows:[
+    { heading:'Resultado', color:[46,125,80], rows:[
       ['Facturado', `€${fmt(totals.facturado)}`],
       ['Efectivo', `€${fmt(totals.efectivo)}`],
       ['Cobrado tarjeta/transf. (+ autopista tarjeta)', `€${fmt(totals.cardServicios)}`],
       ['Efectivo de empresa', `€${fmt(totals.efectivoEmpresa)}`],
     ]},
-    { heading:'Reparto', rows:[
+    { heading:'Reparto', color:[178,120,23], rows:[
       ['Empresa', `€${fmt(totals.empresa)}`],
       ['Chofer', `€${fmt(totals.chofer)}`],
-      ...(totals.propinas ? [['Propinas/redondeo (chofer)', `€${fmt(totals.propinas)}`]] : []),
     ]},
-    { heading:'Gastos y servicios', rows:[
+    { heading:'Gastos y servicios', color:[178,58,58], rows:[
       ['Gastos variables', `€${fmt(totals.gastosVar)}`],
       ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
       ['Autopista', `€${fmt(totals.autopista)}`],
@@ -1676,7 +1685,7 @@ function seccionesDesdeTotales(totals, extra){
       ['— Autopista (efectivo)', `€${fmt(totals.autopistaEfectivo)}`],
       ['— Autopista (tarjeta)', `€${fmt(totals.autopistaTarjeta)}`],
     ]},
-    { heading:'Actividad', rows:[
+    { heading:'Actividad', color:[70,90,150], rows:[
       ['Días trabajados', `${totals.dias}`],
       ['Km recorridos', `${fmt(totals.km)}`],
     ]},

@@ -1572,10 +1572,46 @@ function renderAnualTab(c){
 }
 
 /* ---------- PDF EXPORT ---------- */
-function buildClosingPDF(title, subtitle, sections){
+function drawDashboardCards(doc, marginX, y, contentWidth, cards){
+  const gap = 10;
+  const cols = 2;
+  const cardW = (contentWidth - gap * (cols - 1)) / cols;
+  const cardH = 58;
+  cards.forEach((card, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = marginX + col * (cardW + gap);
+    const cy = y + row * (cardH + gap);
+    doc.setFillColor(card.color[0], card.color[1], card.color[2]);
+    doc.roundedRect(x, cy, cardW, cardH, 6, 6, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    doc.text(card.label, x + 12, cy + 18);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(17);
+    doc.text(String(card.value), x + 12, cy + 42);
+  });
+  doc.setTextColor(0);
+  const rows = Math.ceil(cards.length / cols);
+  return y + rows * (cardH + gap) + 10;
+}
+
+function tarjetasDesdeTotales(totals, extra){
+  const gastosTotales = totals.gastosVar + (extra.gastosFijos||0) + totals.autopista;
+  return [
+    { label:'EFECTIVO DE EMPRESA', value:`€${fmt(totals.efectivoEmpresa)}`, color:[46,125,80] },
+    { label:'COBRADO TARJETA/TRANSF.', value:`€${fmt(totals.cardServicios)}`, color:[41,98,153] },
+    { label:'GASTOS TOTALES', value:`€${fmt(gastosTotales)}`, color:[178,58,58] },
+    { label:'KM RECORRIDOS', value:`${fmt(totals.km)}`, color:[90,90,98] },
+  ];
+}
+
+function buildClosingPDF(title, subtitle, sections, cards){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'a4' });
   const marginX = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
   let y = 50;
   doc.setFont('helvetica','bold');
   doc.setFontSize(18);
@@ -1586,7 +1622,12 @@ function buildClosingPDF(title, subtitle, sections){
   doc.setTextColor(120);
   doc.text(String(subtitle), marginX, y);
   doc.setTextColor(0);
-  y += 30;
+  y += 24;
+
+  if(cards && cards.length){
+    y = drawDashboardCards(doc, marginX, y, pageWidth - marginX*2, cards);
+  }
+  y += 6;
 
   sections.forEach(section => {
     if(y > 760){ doc.addPage(); y = 50; }
@@ -1678,7 +1719,7 @@ function nombreArchivoMes(mes){
 function generarPDFMensual(){
   const mes = state.mesActual || monthKey(todayISO());
   const { totals, extra } = totalesMes(mes);
-  const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra));
+  const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
   doc.save(nombreArchivoMes(mes));
   showToast('PDF descargado');
 }
@@ -1686,7 +1727,7 @@ function generarPDFMensual(){
 async function compartirPDFMensual(){
   const mes = state.mesActual || monthKey(todayISO());
   const { totals, extra } = totalesMes(mes);
-  const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra));
+  const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
   const nombre = nombreArchivoMes(mes);
   const blob = doc.output('blob');
   const file = new File([blob], nombre, { type:'application/pdf' });
@@ -1745,14 +1786,14 @@ function nombreArchivoAnio(year){
 
 function generarPDFAnual(year){
   const { totals, extra } = totalesAnio(year);
-  const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra));
+  const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
   doc.save(nombreArchivoAnio(year));
   showToast('PDF descargado');
 }
 
 async function compartirPDFAnual(year){
   const { totals, extra } = totalesAnio(year);
-  const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra));
+  const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
   const nombre = nombreArchivoAnio(year);
   const blob = doc.output('blob');
   const file = new File([blob], nombre, { type:'application/pdf' });

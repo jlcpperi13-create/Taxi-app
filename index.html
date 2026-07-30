@@ -467,7 +467,7 @@ function cierreCalc(d){
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = round2(choferBase + propinas);
   const efectivoEmpresa = round2(efectivo - importeChofer + gastos.autopista);
-  const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta);
+  const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
   return { facturado, cardServicios, tarjetaBoxTotal, propinas, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
 }
 
@@ -645,7 +645,7 @@ function renderCierreTab(c){
         <div class="meter-cell"><div class="label">Tarjeta/TPV/Transf.</div><div class="value mono" id="calc-tarjeta" style="font-size:14px;">−€${fmt(calc.tarjetaBoxTotal)}</div></div>
       </div>
       <div class="meter-cell" style="margin-top:10px;">
-        <div class="label">Cobrado tarjeta/transf. (+ autopista tarjeta)</div>
+        <div class="label">Cobrado tarjeta/transf. (+ autopista y propinas)</div>
         <div class="value mono" id="calc-tarjeta-servicios" style="font-size:14px;">€${fmt(calc.tarjetaBoxTotal)}</div>
       </div>
       <div class="meter-cell teal" style="margin-top:10px;">
@@ -1482,7 +1482,7 @@ function renderMensualTab(c){
         <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
       </div>
       <div class="meter-cell" style="margin-bottom:10px;">
-        <div class="label">Cobrado tarjeta/transf. (+ autopista tarjeta)</div>
+        <div class="label">Cobrado tarjeta/transf. (+ autopista y propinas)</div>
         <div class="value mono" style="font-size:14px;">€${fmt(totals.cardServicios)}</div>
       </div>
       <div class="meter-cell teal">
@@ -1604,7 +1604,7 @@ function renderAnualTab(c){
           <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:18px;">€${fmt(totals.efectivo)}</div></div>
         </div>
         <div class="meter-cell" style="margin-bottom:10px;">
-          <div class="label">Cobrado tarjeta/transf. (+ autopista tarjeta)</div>
+          <div class="label">Cobrado tarjeta/transf. (+ autopista y propinas)</div>
           <div class="value mono" style="font-size:14px;">€${fmt(totals.cardServicios)}</div>
         </div>
         <div class="meter-cell teal">
@@ -1767,7 +1767,7 @@ function seccionesDesdeTotales(totals, extra){
     { heading:'Resultado', color:[46,125,80], rows:[
       ['Facturado', `€${fmt(totals.facturado)}`],
       ['Efectivo', `€${fmt(totals.efectivo)}`],
-      ['Cobrado tarjeta/transf. (+ autopista tarjeta)', `€${fmt(totals.cardServicios)}`],
+      ['Cobrado tarjeta/transf. (+ autopista y propinas)', `€${fmt(totals.cardServicios)}`],
       ['Efectivo de empresa', `€${fmt(totals.efectivoEmpresa)}`],
     ]},
     { heading:'Reparto', color:[178,120,23], rows:[

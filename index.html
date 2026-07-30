@@ -245,6 +245,8 @@ let state = {
   pinMode: 'driver',
   masterPin: '',
   masterPinUnlocked: false,
+  editRequiereMaster: false,
+  pendingEditCierreId: null,
 };
 
 const PROTECTED_TABS = ['cierre'];
@@ -313,6 +315,7 @@ async function loadData(){
       if(parsed.lastTaxi) state.lastTaxi = parsed.lastTaxi;
       if(parsed.pins && typeof parsed.pins === 'object') state.pins = parsed.pins;
       if(parsed.masterPin) state.masterPin = parsed.masterPin;
+      if(typeof parsed.editRequiereMaster === 'boolean') state.editRequiereMaster = parsed.editRequiereMaster;
     }
   }catch(e){ /* keep defaults */ }
   if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
@@ -346,7 +349,7 @@ async function saveMantenimientos(){
   catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
 }
 async function saveConfig(){
-  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, tiposMantenimiento: state.tiposMantenimiento, lastTaxi: state.lastTaxi, pins: state.pins, masterPin: state.masterPin })); }
+  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, tiposMantenimiento: state.tiposMantenimiento, lastTaxi: state.lastTaxi, pins: state.pins, masterPin: state.masterPin, editRequiereMaster: state.editRequiereMaster })); }
   catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
 }
 
@@ -681,6 +684,14 @@ function renderCierreTab(c){
       ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO])).join('')}
     </div>` : ''}
 
+    ${editing && Array.isArray(editing.historialEdiciones) && editing.historialEdiciones.length ? `
+    <div class="card">
+      <div class="subhead">Historial de cambios (${editing.historialEdiciones.length})</div>
+      ${editing.historialEdiciones.slice().reverse().map(h => `
+        <div class="entry-meta">${new Date(h.ts).toLocaleString('es-ES', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})} · editado por ${h.chofer}${h.viaMaster ? ' · con PIN maestro' : ''}</div>
+      `).join('')}
+    </div>` : ''}
+
     <div class="btn-row">
       ${editing ? `<button class="btn btn-danger" onclick="deleteCierre('${editing.id}')">Eliminar</button>` : ''}
       <button class="btn btn-primary" onclick="saveCierre(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Registrar cierre'}</button>
@@ -726,7 +737,7 @@ function archivedServicioRowHTML(s){
   const propina = +s.propina || 0;
   return `<div class="entry">
     <div class="entry-top">
-      <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
+      <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
     </div>
     <div class="entry-meta">${[s.origen,s.destino].filter(Boolean).join(' → ') || 'Sin ruta'} ${s.taxi ? '· taxi '+s.taxi : ''}</div>
@@ -799,7 +810,23 @@ function liveCalc(){
   if(btn) btn.setAttribute('onclick', `gotoGastosFor('${d.fecha}')`);
 }
 
-function editCierre(id){ state.editingCierreId = id; state.tab = 'cierre'; render(); window.scrollTo(0,0); }
+function editCierre(id){
+  if(state.editRequiereMaster && tieneMasterPin() && !state.masterPinUnlocked){
+    state.pinMode = 'master';
+    state.pendingEditCierreId = id;
+    state.pinTarget = 'cierre';
+    state.pinInput = '';
+    state.pinError = false;
+    state.tab = 'pinlock';
+    render();
+    window.scrollTo(0,0);
+    return;
+  }
+  state.editingCierreId = id;
+  state.tab = 'cierre';
+  render();
+  window.scrollTo(0,0);
+}
 
 async function closeShiftNow(){
   document.getElementById('f-fecha').value = todayISO();
@@ -824,6 +851,12 @@ async function saveCierre(id, stampNow){
     if(prev && prev.horaCierre) d.horaCierre = prev.horaCierre;
   }
 
+  const calcAviso = cierreCalc(d);
+  if(calcAviso.kmJornada > 0 && calcAviso.eurosPorKm < 0.55){
+    const seguir = confirm(`Ojo: este cierre sale a €${fmt(calcAviso.eurosPorKm)}/km, por debajo de lo habitual (0,55 €/km).\n\n¿Seguro que quieres guardarlo así?`);
+    if(!seguir) return;
+  }
+
   /* Archivar dentro del cierre los servicios y gastos de ESE turno (fecha + chofer) y quitarlos
      de las listas generales, para que el contador del turno en curso vuelva a cero */
   const prevCierre = id ? state.cierres.find(x=>x.id===id) : null;
@@ -835,6 +868,11 @@ async function saveCierre(id, stampNow){
   d.gastosArchivados = [...prevGastosArchivados, ...nuevosGastos];
   state.servicios = state.servicios.filter(s => !(s.fecha === d.fecha && s.chofer === d.chofer));
   state.gastos = state.gastos.filter(g => !(g.tipo === 'diario' && g.fecha === d.fecha && g.chofer === d.chofer));
+
+  d.historialEdiciones = Array.isArray(prevCierre && prevCierre.historialEdiciones) ? [...prevCierre.historialEdiciones] : [];
+  if(id){
+    d.historialEdiciones.push({ ts: new Date().toISOString(), chofer: state.driver, viaMaster: !!(state.editRequiereMaster && state.masterPinUnlocked) });
+  }
 
   const wasNew = !id;
   if(id){
@@ -1038,9 +1076,12 @@ function renderServiciosTab(c){
     <div class="card">
       <div class="row2 field">
         <div><label>Fecha</label><input type="date" id="s-fecha" value="${s.fecha}"></div>
-        <div><label>Nº taxi</label><input type="text" id="s-taxi" value="${s.taxi}" placeholder="Nº de taxi"></div>
+        <div><label>Hora</label><input type="time" id="s-hora" value="${s.hora || ''}"></div>
       </div>
-      <div class="field"><label>Cliente (opcional)</label><input type="text" id="s-cliente" value="${s.cliente}" placeholder="Nombre del cliente"></div>
+      <div class="row2 field">
+        <div><label>Nº taxi</label><input type="text" id="s-taxi" value="${s.taxi}" placeholder="Nº de taxi"></div>
+        <div><label>Cliente (opcional)</label><input type="text" id="s-cliente" value="${s.cliente}" placeholder="Nombre del cliente"></div>
+      </div>
       <div class="row2 field">
         <div><label>Origen</label><input type="text" id="s-origen" value="${s.origen}" placeholder="Punto de recogida"></div>
         <div><label>Destino</label><input type="text" id="s-destino" value="${s.destino}" placeholder="Punto de destino"></div>
@@ -1104,7 +1145,7 @@ function servicioRowHTML(s){
   const propina = +s.propina || 0;
   return `<div class="entry" onclick="editServicio('${s.id}')" style="cursor:pointer;">
     <div class="entry-top">
-      <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
+      <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
     </div>
     <div class="entry-meta">${[s.origen,s.destino].filter(Boolean).join(' → ') || 'Sin ruta'} ${s.taxi ? '· taxi '+s.taxi : ''}</div>
@@ -1157,6 +1198,7 @@ async function saveServicio(id){
   const s = {
     id: id || uid(),
     fecha,
+    hora: document.getElementById('s-hora').value || '',
     cliente,
     origen: document.getElementById('s-origen').value.trim(),
     destino: document.getElementById('s-destino').value.trim(),
@@ -1908,6 +1950,11 @@ function verificarPin(){
       state.tab = state.pinTarget || 'ajustes';
       state.pinInput = '';
       state.pinError = false;
+      if(state.pendingEditCierreId){
+        state.editingCierreId = state.pendingEditCierreId;
+        state.pendingEditCierreId = null;
+        state.tab = 'cierre';
+      }
       render();
     } else {
       state.pinError = true;
@@ -1939,6 +1986,12 @@ function renderAjustesTab(c){
     <details class="notice-toggle"><summary>Info</summary><div class="notice">Esta app guarda los datos solo en este navegador (localStorage), sin pasar por ningún servidor. Si borras datos de navegación, desinstalas el navegador o cambias de dispositivo, los datos se pierden. Haz copias de seguridad con regularidad.</div></details>
 
     <div class="card">
+      <div class="subhead">Ayuda</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Manual con la explicación de cada pestaña, el sistema de PIN y las copias de seguridad.</div>
+      <a class="btn btn-ghost" style="display:block; text-align:center; text-decoration:none;" href="ayuda.html" target="_blank" rel="noopener">📖 Abrir manual de uso</a>
+    </div>
+
+    <div class="card">
       <div class="subhead">Copia de seguridad</div>
       <div style="font-size:13px; color:var(--muted); margin-bottom:14px;">${state.cierres.length} cierres · ${todosLosServicios().length} servicios (${state.servicios.length} sin cerrar) · ${state.gastos.length} gastos · ${state.mantenimientos.length} mantenimientos · ~${(bytes/1024).toFixed(1)} KB</div>
       <button class="btn btn-primary" style="margin-bottom:10px;" onclick="exportBackup()">⬇ Exportar copia de seguridad</button>
@@ -1967,12 +2020,21 @@ function renderAjustesTab(c){
 
     <div class="card">
       <div class="subhead">PIN de acceso a Turno y Cierres</div>
-      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Protege las pestañas Cierre, Mensual y Anual con un PIN individual por chofer, para que cada uno solo pueda ver y editar los suyos. Déjalo vacío para no pedir PIN.</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Protege la pestaña Cierre con un PIN individual por chofer, para que cada uno solo pueda ver y editar los suyos. Déjalo vacío para no pedir PIN.</div>
       <div class="row2 field">
         <div><label>PIN de ${state.drivers[0]}</label><input type="tel" inputmode="numeric" maxlength="6" id="a-pin1" value="${state.pins[0]||''}" placeholder="Sin PIN"></div>
         <div><label>PIN de ${state.drivers[1]}</label><input type="tel" inputmode="numeric" maxlength="6" id="a-pin2" value="${state.pins[1]||''}" placeholder="Sin PIN"></div>
       </div>
       <button class="btn btn-ghost" onclick="savePins()">Guardar PIN</button>
+    </div>
+
+    <div class="card">
+      <div class="subhead">Bloqueo de edición de cierres</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">${tieneMasterPin() ? 'Si lo activas, cada chofer podrá entrar y ver sus cierres con su propio PIN, pero para editarlos o eliminarlos le pedirá también el PIN maestro. Si lo dejas desactivado, cada chofer puede editar sus cierres libremente con solo su PIN.' : 'Necesitas configurar antes un PIN maestro (arriba) para poder activar esto.'}</div>
+      <label style="display:flex; align-items:center; gap:8px; font-size:14px; ${tieneMasterPin() ? '' : 'opacity:0.5;'}">
+        <input type="checkbox" id="a-edit-master" ${state.editRequiereMaster?'checked':''} ${tieneMasterPin() ? '' : 'disabled'} onchange="toggleEditRequiereMaster(this.checked)">
+        Exigir PIN maestro para editar o eliminar cierres
+      </label>
     </div>
 
     <div class="card">
@@ -1997,6 +2059,7 @@ function exportBackup(){
     tiposMantenimiento: state.tiposMantenimiento,
     pins: state.pins,
     masterPin: state.masterPin,
+    editRequiereMaster: state.editRequiereMaster,
     cierres: state.cierres,
     servicios: state.servicios,
     gastos: state.gastos,
@@ -2030,6 +2093,7 @@ function importBackup(file){
       if(Array.isArray(payload.tiposMantenimiento) && payload.tiposMantenimiento.length) state.tiposMantenimiento = payload.tiposMantenimiento;
       if(payload.pins && typeof payload.pins === 'object') state.pins = payload.pins;
       if(payload.masterPin) state.masterPin = payload.masterPin;
+      if(typeof payload.editRequiereMaster === 'boolean') state.editRequiereMaster = payload.editRequiereMaster;
       if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
       await saveCierres(); await saveServicios(); await saveGastos(); await saveMantenimientos(); await saveConfig();
       showToast('Copia importada correctamente');
@@ -2064,8 +2128,16 @@ function saveMasterPin(){
   const p = document.getElementById('a-master-pin').value.replace(/[^0-9]/g,'').slice(0,6);
   state.masterPin = p;
   if(p) state.masterPinUnlocked = true; // ya estás dentro de Ajustes, no hace falta pedírtelo de nuevo ahora mismo
+  else state.editRequiereMaster = false; // sin PIN maestro no tiene sentido mantener este bloqueo activo
   saveConfig();
   showToast(p ? 'PIN de Ajustes guardado' : 'PIN de Ajustes eliminado');
+  render();
+}
+
+function toggleEditRequiereMaster(v){
+  state.editRequiereMaster = !!v;
+  saveConfig();
+  showToast(v ? 'Edición de cierres bloqueada con PIN maestro' : 'Edición de cierres libre');
   render();
 }
 
@@ -2077,6 +2149,26 @@ function wipeAllData(){
   showToast('Datos borrados');
   render();
 }
+
+/* ---------- BLOQUEO POR INACTIVIDAD ---------- */
+const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutos
+state.lastActivity = Date.now();
+function marcarActividad(){ state.lastActivity = Date.now(); }
+['pointerdown','keydown','touchstart'].forEach(ev => {
+  document.addEventListener(ev, marcarActividad, { passive:true });
+});
+setInterval(() => {
+  if(!state.loaded) return;
+  const habiaAlgoDesbloqueado = (state.pinUnlocked && Object.keys(state.pinUnlocked).length) || state.masterPinUnlocked;
+  if(!habiaAlgoDesbloqueado) return;
+  if(Date.now() - state.lastActivity < INACTIVITY_MS) return;
+  state.pinUnlocked = {};
+  state.masterPinUnlocked = false;
+  if(state.tab !== 'pinlock' && (PROTECTED_TABS.includes(state.tab) || MASTER_TABS.includes(state.tab))){
+    irATab(state.tab);
+    render();
+  }
+}, 20000);
 
 /* ---------- init ---------- */
 /* loadData() se llama automáticamente cuando Firebase confirma la sesión iniciada (ver script type="module" al final) */

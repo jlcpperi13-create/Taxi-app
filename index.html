@@ -317,6 +317,7 @@ async function loadData(){
   }catch(e){ /* keep defaults */ }
   if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
   if(tabRequierePin(state.tab) && tienePin(state.driver)){
+    state.pinMode = 'driver';
     state.pinTarget = state.tab;
     state.tab = 'pinlock';
   }
@@ -1884,6 +1885,7 @@ function renderPinLockTab(c){
     <div class="card" style="text-align:center; padding:36px 20px;">
       <div style="font-size:38px; margin-bottom:8px;">🔒</div>
       <div class="subhead" style="margin-bottom:4px;">Acceso protegido</div>
+      ${!esMaster ? `<div style="margin:6px 0 16px;">${driverPillHTML()}</div>` : ''}
       <div style="font-size:13px; color:var(--muted); margin-bottom:20px;">${titulo}</div>
       <input id="pin-input" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="6" autofocus
         style="width:140px; text-align:center; font-size:24px; letter-spacing:8px; padding:10px; border-radius:8px; border:1px solid ${state.pinError ? '#c23b3b' : '#ccc'}; margin-bottom:12px;"

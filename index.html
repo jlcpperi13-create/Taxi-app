@@ -247,14 +247,15 @@ let state = {
   masterPinUnlocked: false,
 };
 
-const PROTECTED_TABS = ['cierre','mensual','anual'];
+const PROTECTED_TABS = ['cierre'];
+const MASTER_TABS = ['ajustes','mensual','anual'];
 function driverIndex(name){ return state.drivers.indexOf(name); }
 function tienePin(driver){ const i = driverIndex(driver); return i > -1 && !!(state.pins && state.pins[i]); }
 function estaDesbloqueado(driver){ return !!(state.pinUnlocked && state.pinUnlocked[driver]); }
 function tabRequierePin(tab){ return PROTECTED_TABS.includes(tab); }
 function tieneMasterPin(){ return !!(state.masterPin); }
 function irATab(id){
-  if(id === 'ajustes' && tieneMasterPin() && !state.masterPinUnlocked){
+  if(MASTER_TABS.includes(id) && tieneMasterPin() && !state.masterPinUnlocked){
     state.pinMode = 'master';
     state.pinTarget = id;
     state.pinInput = '';
@@ -596,7 +597,7 @@ function renderCierreTab(c){
 
   c.innerHTML = `
     ${!editing ? '<details class="notice-toggle"><summary>Info</summary><div class="notice">Datos guardados solo en este navegador/dispositivo. Si cambias de móvil o borras datos de navegación, se pierden — usa "Copia de seguridad" en Ajustes para exportarlos.</div></details>' : ''}
-    <div class="section-title">${editing ? 'Editar cierre' : 'Nuevo cierre'}<span class="sub">${state.cierres.length} días registrados</span></div>
+    <div class="section-title">${editing ? 'Editar cierre' : 'Nuevo cierre'}<span class="sub">${state.cierres.filter(x=>x.chofer===state.driver).length} días registrados</span></div>
     ${driverPillHTML()}
 
     ${!editing ? `<button class="btn btn-primary" style="margin-bottom:4px;" onclick="closeShiftNow()">⏱ Cerrar turno ahora</button>
@@ -687,8 +688,9 @@ function renderCierreTab(c){
 
     <div class="section-title" style="margin-top:24px;">Historial</div>
     <div class="card" style="padding:4px 16px;">
-      ${state.cierres.length === 0 ? emptyHTML('Sin cierres todavía', 'Registra el primer día arriba.') :
-        [...state.cierres].sort((a,b)=> b.fecha.localeCompare(a.fecha)).map(cierreRowHTML).join('')}
+      ${(() => { const propios = state.cierres.filter(x => x.chofer === state.driver);
+        return propios.length === 0 ? emptyHTML('Sin cierres todavía', 'Registra el primer día arriba.') :
+        [...propios].sort((a,b)=> b.fecha.localeCompare(a.fecha)).map(cierreRowHTML).join(''); })()}
     </div>
   `;
 }
@@ -1384,9 +1386,9 @@ function changeMes(delta){
 
 function renderMensualTab(c){
   const mes = state.mesActual || monthKey(todayISO());
-  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes && d.chofer === state.driver).sort((a,b)=> a.fecha.localeCompare(b.fecha));
-  const serviciosMes = serviciosDeMes(mes, state.driver).filter(s => s.estado !== 'anulado');
-  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes && g.chofer === state.driver);
+  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
+  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
 
   const fechasUnicas = new Set();
   const totals = cierresMes.reduce((acc, d) => {
@@ -1502,7 +1504,7 @@ function renderAnualTab(c){
   const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, gastosFijos:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
 
   const fechasPorMes = {};
-  state.cierres.filter(d => d.chofer === state.driver).forEach(d => {
+  state.cierres.forEach(d => {
     const k = monthKey(d.fecha);
     const calc = cierreCalc(d);
     const m = ensure(k);
@@ -1524,11 +1526,11 @@ function renderAnualTab(c){
     (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
   Object.keys(fechasPorMes).forEach(k => { ensure(k).dias = fechasPorMes[k].size; });
-  state.gastos.filter(g => g.tipo === 'periodico' && g.chofer === state.driver).forEach(g => {
+  state.gastos.filter(g => g.tipo === 'periodico').forEach(g => {
     const k = monthKey(g.fecha);
     ensure(k).gastosFijos += (+g.importe || 0);
   });
-  todosLosServicios(state.driver).filter(s => s.estado !== 'anulado').forEach(s => {
+  todosLosServicios().filter(s => s.estado !== 'anulado').forEach(s => {
     const k = monthKey(s.fecha);
     ensure(k).servicios += (+s.importe || 0);
   });
@@ -1747,9 +1749,9 @@ function seccionesDesdeTotales(totals, extra){
 }
 
 function totalesMes(mes){
-  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes && d.chofer === state.driver).sort((a,b)=> a.fecha.localeCompare(b.fecha));
-  const serviciosMes = serviciosDeMes(mes, state.driver).filter(s => s.estado !== 'anulado');
-  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes && g.chofer === state.driver);
+  const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
+  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
   const fechasUnicas = new Set();
   const totals = cierresMes.reduce((acc, d) => {
     const calc = cierreCalc(d);
@@ -1810,7 +1812,7 @@ function totalesAnio(year){
   const byMonth = {};
   const fechasPorMes = {};
   const ensure = k => byMonth[k] || (byMonth[k] = { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, gastosFijos:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, servicios:0, empresa:0, chofer:0, propinas:0, dias:0, km:0 });
-  state.cierres.filter(d => d.chofer === state.driver).forEach(d => {
+  state.cierres.forEach(d => {
     const k = monthKey(d.fecha);
     if(!k.startsWith(year)) return;
     const calc = cierreCalc(d);
@@ -1833,10 +1835,10 @@ function totalesAnio(year){
     (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
   Object.keys(fechasPorMes).forEach(k => { ensure(k).dias = fechasPorMes[k].size; });
-  state.gastos.filter(g => g.tipo === 'periodico' && g.chofer === state.driver && monthKey(g.fecha).startsWith(year)).forEach(g => {
+  state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha).startsWith(year)).forEach(g => {
     ensure(monthKey(g.fecha)).gastosFijos += (+g.importe || 0);
   });
-  todosLosServicios(state.driver).filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
+  todosLosServicios().filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
     ensure(monthKey(s.fecha)).servicios += (+s.importe || 0);
   });
   const months = Object.keys(byMonth).sort();
@@ -1877,7 +1879,7 @@ async function compartirPDFAnual(year){
 /* ---------- PIN LOCK ---------- */
 function renderPinLockTab(c){
   const esMaster = state.pinMode === 'master';
-  const titulo = esMaster ? 'Introduce el PIN de Ajustes' : `Introduce el PIN de ${state.driver}`;
+  const titulo = esMaster ? 'Introduce el PIN maestro' : `Introduce el PIN de ${state.driver}`;
   c.innerHTML = `
     <div class="card" style="text-align:center; padding:36px 20px;">
       <div style="font-size:38px; margin-bottom:8px;">🔒</div>
@@ -1956,7 +1958,7 @@ function renderAjustesTab(c){
 
     <div class="card">
       <div class="subhead">PIN maestro de Ajustes</div>
-      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">${tieneMasterPin() ? 'Ajustes está protegido. Solo quien conozca este PIN puede entrar aquí a ver o cambiar los PIN de los choferes.' : 'Pon un PIN para que nadie más pueda entrar a Ajustes y cambiar los PIN de los choferes.'}</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">${tieneMasterPin() ? 'Ajustes, Cierre mensual y Cierre anual están protegidos. Solo quien conozca este PIN puede entrar a verlos, generar el cierre único del mes/año, o cambiar los PIN de los choferes.' : 'Pon un PIN para proteger Ajustes, Cierre mensual y Cierre anual, y que nadie más pueda generar el cierre combinado ni cambiar los PIN de los choferes.'}</div>
       <div class="field"><label>PIN de Ajustes</label><input type="tel" inputmode="numeric" maxlength="6" id="a-master-pin" value="${state.masterPin||''}" placeholder="Sin PIN"></div>
       <button class="btn btn-ghost" onclick="saveMasterPin()">Guardar PIN de Ajustes</button>
     </div>

@@ -466,7 +466,7 @@ function cierreCalc(d){
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = round2(choferBase + propinas);
-  const efectivoEmpresa = round2(efectivo - importeChofer + gastos.autopista);
+  const efectivoEmpresa = round2(efectivo - choferBase + gastos.autopista);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
   return { facturado, cardServicios, tarjetaBoxTotal, propinas, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
 }

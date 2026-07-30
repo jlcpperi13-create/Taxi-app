@@ -459,7 +459,7 @@ function cierreCalc(d){
   gastos.autopistaTarjeta = round2(gastos.autopistaTarjeta + autopistaEnServicios);
   gastos.autopista = round2(gastos.autopistaEfectivo + gastos.autopistaTarjeta);
   const gastosEfectivo = round2(gastos.gasolina + gastos.otros);
-  const efectivo = round2(facturado - cardServicios - gastosEfectivo - gastos.autopistaTarjeta);
+  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - gastos.autopistaTarjeta);
   const kmJornada = Math.max(0, kmFin - kmInicio);
   const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
   const pct = (+d.pctEmpresa || state.pctEmpresa) / 100;

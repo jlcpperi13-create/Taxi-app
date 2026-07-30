@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ayuda — Control Taxi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #15181A;
+  --surface: #1F2427;
+  --surface-2: #262B2E;
+  --teal: #3FA796;
+  --coral: #E4574C;
+  --ink: #EDEDE7;
+  --muted: #9AA0A0;
+  --hair: #33393C;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:'Work Sans',sans-serif; padding:20px 16px 60px; max-width:640px; margin:0 auto;}
+h1,h2,.display{font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.02em; text-transform:uppercase;}
+h1{font-size:26px; margin:8px 0 4px;}
+.subtitle{color:var(--muted); font-size:14px; margin-bottom:24px;}
+h2{font-size:19px; color:var(--teal); margin:28px 0 10px; border-bottom:1px solid var(--hair); padding-bottom:6px;}
+.card{background:var(--surface); border-radius:14px; padding:16px 18px; margin-bottom:14px;}
+p{line-height:1.5; margin:0 0 10px; font-size:14.5px;}
+ul{margin:0 0 10px; padding-left:20px;}
+li{line-height:1.5; margin-bottom:6px; font-size:14.5px;}
+strong{color:var(--ink);}
+.lock{background:var(--surface-2); border-left:3px solid var(--amber, #FFB020); border-radius:8px; padding:10px 14px; font-size:13.5px; color:var(--muted); margin-top:10px;}
+.warn{background:var(--surface-2); border-left:3px solid var(--coral); border-radius:8px; padding:10px 14px; font-size:13.5px; color:var(--muted); margin-top:10px;}
+.back{display:inline-block; margin-top:24px; color:var(--teal); text-decoration:none; font-size:14px;}
+a{color:var(--teal);}
+</style>
+</head>
+<body>
+
+  <div class="display" style="font-size:13px; color:var(--muted); letter-spacing:0.15em;">CONTROL TAXI</div>
+  <h1>Manual de uso</h1>
+  <div class="subtitle">Guía rápida de todas las pestañas y funciones de la app.</div>
+
+  <h2>1. Instalación</h2>
+  <div class="card">
+    <p>Abre el enlace de la app en Chrome (Android) o Safari (iPhone) y toca el menú del navegador → <strong>"Añadir a pantalla de inicio"</strong>. A partir de ahí se abre como una app normal, sin barra del navegador.</p>
+    <p>Los datos se guardan <strong>solo en este dispositivo/navegador</strong>. Si desinstalas la app o borras datos de navegación, se pierden a menos que hayas hecho una copia de seguridad (ver punto 8).</p>
+  </div>
+
+  <h2>2. Iniciar sesión</h2>
+  <div class="card">
+    <p>Primero se inicia sesión con correo y contraseña. Después aparece un <strong>selector de chofer</strong> para elegir quién va a usar la app en ese momento.</p>
+  </div>
+
+  <h2>3. Pestaña Cierre (turno diario)</h2>
+  <div class="card">
+    <ul>
+      <li>Se registra fecha, clientes, facturado total y kilómetros de inicio/fin.</li>
+      <li>La app calcula km recorridos, €/km, reparto empresa/chofer, efectivo y <strong>Efectivo de empresa</strong>.</li>
+      <li>Botón "⏱ Cerrar turno ahora" o elegir otra fecha para cierres atrasados.</li>
+      <li>Al cerrar, los servicios y gastos del día quedan archivados dentro de ese cierre.</li>
+      <li><strong>Historial</strong>: lista de días ya cerrados de ese chofer; se editan tocándolos.</li>
+      <li><strong>Aviso de €/km bajo</strong>: si sale por debajo de 0,55 €/km, pregunta antes de guardar.</li>
+      <li><strong>Historial de cambios</strong>: si se edita un cierre ya existente, queda anotado quién lo editó y cuándo.</li>
+    </ul>
+    <div class="lock">🔒 Pide el PIN individual de cada chofer. Cada uno ve y edita solo sus propios cierres.</div>
+  </div>
+
+  <h2>4. Pestaña Servicios</h2>
+  <div class="card">
+    <p>Registro de cada carrera: fecha, hora, nº de taxi, cliente, origen, destino, importe, descuento, forma de pago, autopista incluida y propina (100% para el chofer), y estado (Pagado / Pendiente / Anulado).</p>
+  </div>
+
+  <h2>5. Pestaña Gastos</h2>
+  <div class="card">
+    <p><strong>Diarios</strong>: gasolina, gastos con tarjeta, autopista (efectivo o tarjeta), otros — ligados a un día y chofer.</p>
+    <p><strong>Fijos/periódicos</strong>: gastos recurrentes del negocio (seguro, alquiler, etc.), no ligados a un turno.</p>
+  </div>
+
+  <h2>6. Mantenimiento</h2>
+  <div class="card">
+    <p>Revisiones y recordatorios (aceite, neumáticos, ITV, frenos, filtros, batería, etc.), con avisos por kilómetros o por fecha.</p>
+  </div>
+
+  <h2>7. Cierre Mensual y Anual</h2>
+  <div class="card">
+    <p>Resumen <strong>combinado de ambos choferes</strong> (un único cierre por mes/año): facturado, efectivo, reparto, gastos, km y días trabajados (contados por fecha real). Con tarjetas de colores y botones para descargar o compartir el PDF.</p>
+    <div class="lock">🔒 Piden el <strong>PIN maestro</strong>, pensado solo para el propietario.</div>
+  </div>
+
+  <h2>8. Ajustes</h2>
+  <div class="card">
+    <ul>
+      <li><strong>Nombres de los choferes.</strong></li>
+      <li><strong>PIN maestro</strong>: protege Ajustes, Mensual y Anual.</li>
+      <li><strong>PIN por chofer</strong>: protege la pestaña Cierre, individual para cada uno.</li>
+      <li><strong>Bloqueo de edición de cierres</strong>: si se activa, editar o eliminar un cierre pide también el PIN maestro, aunque el chofer ya haya entrado con el suyo.</li>
+      <li><strong>Copia de seguridad</strong>: exportar/importar todos los datos.</li>
+      <li><strong>Borrar todo</strong>: elimina cierres, gastos, servicios y mantenimientos (no toca PIN ni nombres).</li>
+    </ul>
+    <div class="lock">🔒 Si pasan 15 minutos sin tocar la pantalla, los PIN desbloqueados se bloquean solos.</div>
+    <div class="warn">⚠️ No hay recuperación automática de PIN. Si se olvida el PIN maestro, hay que restaurar una copia de seguridad hecha antes de configurarlo, o modificar el archivo de la app.</div>
+  </div>
+
+  <h2>9. Copias de seguridad</h2>
+  <div class="card">
+    <p>Haz una copia desde Ajustes de vez en cuando, sobre todo antes de cambiar de móvil. Los <code>index.html</code> antiguos se pueden borrar sin problema; <code>manifest.json</code> y <code>service-worker.js</code> deben quedarse siempre en el repositorio.</p>
+  </div>
+
+  <a class="back" href="javascript:history.back()">‹ Volver a la app</a>
+
+</body>
+</html>

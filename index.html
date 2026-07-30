@@ -280,6 +280,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7
 const fmt = (n) => (isFinite(n) ? n : 0).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2});
 const round2 = (n) => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const todayISO = () => new Date().toISOString().slice(0,10);
+const horaActualHHMM = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
 const monthKey = (iso) => iso.slice(0,7);
 const monthLabel = (key) => {
   const [y,m] = key.split('-');
@@ -1068,7 +1069,7 @@ function renderServiciosTab(c){
   const editing = state.editingServicioId ? state.servicios.find(x=>x.id===state.editingServicioId) : null;
   const s = editing
     ? { ...editing, importe: (editing.precioBase != null ? editing.precioBase : editing.importe), descuentoPct: editing.descuentoPct || '' }
-    : { fecha: state.workDate || todayISO(), taxi: state.lastTaxi || '', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag', descuentoPct:'' };
+    : { fecha: state.workDate || todayISO(), hora: horaActualHHMM(), taxi: state.lastTaxi || '', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag', descuentoPct:'' };
 
   c.innerHTML = `
     <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${state.servicios.length} registrados</span></div>

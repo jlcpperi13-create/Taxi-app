@@ -1,7 +1,7 @@
 {
-  "name": "Taxímetro · Cierre",
-  "short_name": "Taxímetro",
-  "description": "Control de cierres, gastos y servicios de taxi",
+  "name": "MiContable",
+  "short_name": "MiContable",
+  "description": "Control de turnos, gastos y servicios de transporte",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

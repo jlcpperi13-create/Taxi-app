@@ -1,4 +1,4 @@
-const CACHE_NAME = "control-taxi-cache-v3";
+const CACHE_NAME = "micontable-cache-v1";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -32,7 +32,7 @@ self.addEventListener("activate", (event) => {
 // index.html y navegación: siempre intenta la red primero (para no quedarse con versiones viejas).
 // Solo usa la caché si no hay conexión a internet.
 self.addEventListener("fetch", (event) => {
-  const isNavigation = event.request.mode === "navigate" || event.request.url.endsWith("index.html") || event.request.url.endsWith("/");
+  const isNavigation = event.request.mode === "navigate" || event.request.url.endsWith("index.html") || event.request.url.endsWith("/") || event.request.url.endsWith("manifest.json");
   if (isNavigation) {
     event.respondWith(
       fetch(event.request)

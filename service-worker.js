@@ -1,4 +1,4 @@
-const CACHE_NAME = "micontable-cache-v1";
+const CACHE_NAME = "micontable-cache-v2";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -29,18 +29,23 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// index.html y navegación: siempre intenta la red primero (para no quedarse con versiones viejas).
-// Solo usa la caché si no hay conexión a internet.
+// index.html y navegación: se muestra al instante la copia guardada (para que abrir sea rápido),
+// y en paralelo se descarga la versión más reciente en segundo plano para la próxima vez.
 self.addEventListener("fetch", (event) => {
   const isNavigation = event.request.mode === "navigate" || event.request.url.endsWith("index.html") || event.request.url.endsWith("/") || event.request.url.endsWith("manifest.json");
   if (isNavigation) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
-          return response;
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cachedResponse) => {
+          const networkFetch = fetch(event.request)
+            .then((networkResponse) => {
+              cache.put(event.request, networkResponse.clone());
+              return networkResponse;
+            })
+            .catch(() => cachedResponse);
+          return cachedResponse || networkFetch;
         })
-        .catch(() => caches.match(event.request))
+      )
     );
     return;
   }

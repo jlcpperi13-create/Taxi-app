@@ -7,8 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>MiContable · Cierre</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 :root{
   --bg: #15181A;
@@ -1702,6 +1701,19 @@ function renderAnualTab(c){
 }
 
 /* ---------- PDF EXPORT ---------- */
+let _jsPDFLoading = null;
+function cargarJsPDF(){
+  if(window.jspdf) return Promise.resolve();
+  if(_jsPDFLoading) return _jsPDFLoading;
+  _jsPDFLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => { _jsPDFLoading = null; reject(new Error('No se pudo cargar el generador de PDF. Comprueba tu conexión.')); };
+    document.head.appendChild(s);
+  });
+  return _jsPDFLoading;
+}
 function drawDashboardCards(doc, marginX, y, contentWidth, cards){
   const gap = 10;
   const cols = 2;
@@ -1857,7 +1869,8 @@ function nombreArchivoMes(mes){
   return `cierre_${monthLabel(mes).replace(' ', '_')}.pdf`;
 }
 
-function generarPDFMensual(){
+async function generarPDFMensual(){
+  try{ await cargarJsPDF(); }catch(e){ showToast(e.message); return; }
   const mes = state.mesActual || monthKey(todayISO());
   const { totals, extra } = totalesMes(mes);
   const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
@@ -1866,6 +1879,7 @@ function generarPDFMensual(){
 }
 
 async function compartirPDFMensual(){
+  try{ await cargarJsPDF(); }catch(e){ showToast(e.message); return; }
   const mes = state.mesActual || monthKey(todayISO());
   const { totals, extra } = totalesMes(mes);
   const doc = buildClosingPDF('Cierre mensual', monthLabel(mes), seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
@@ -1927,7 +1941,8 @@ function nombreArchivoAnio(year){
   return `cierre_anual_${year}.pdf`;
 }
 
-function generarPDFAnual(year){
+async function generarPDFAnual(year){
+  try{ await cargarJsPDF(); }catch(e){ showToast(e.message); return; }
   const { totals, extra } = totalesAnio(year);
   const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
   doc.save(nombreArchivoAnio(year));
@@ -1935,6 +1950,7 @@ function generarPDFAnual(year){
 }
 
 async function compartirPDFAnual(year){
+  try{ await cargarJsPDF(); }catch(e){ showToast(e.message); return; }
   const { totals, extra } = totalesAnio(year);
   const doc = buildClosingPDF('Resumen anual', year, seccionesDesdeTotales(totals, extra), tarjetasDesdeTotales(totals, extra));
   const nombre = nombreArchivoAnio(year);

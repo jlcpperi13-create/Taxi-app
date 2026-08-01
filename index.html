@@ -169,6 +169,16 @@ input,select{font-family:inherit;}
 
 <div class="app" id="app" style="display:none;"></div>
 
+<div class="lock-screen" id="offlineLockScreen" style="display:none;">
+  <div class="lock-box">
+    <div class="lock-icon">📶</div>
+    <div class="lock-title display">Sin conexión</div>
+    <div class="lock-sub">Han pasado más de 7 días sin que esta app se conecte a internet. Conéctate a internet (datos o wifi) para poder seguir usándola.</div>
+    <div class="lock-error" id="offlineLockError"></div>
+    <button class="btn btn-primary" onclick="reintentarConexion()">Reintentar</button>
+  </div>
+</div>
+
 <script>
 /* ---------- pantalla de acceso (mostrar/ocultar) ---------- */
 function showApp(){
@@ -178,10 +188,30 @@ function showApp(){
 function hideApp(){
   document.getElementById('lockScreen').style.display = '';
   document.getElementById('app').style.display = 'none';
+  document.getElementById('offlineLockScreen').style.display = 'none';
   const emailEl = document.getElementById('loginEmail');
   const passEl = document.getElementById('loginPassword');
   if(emailEl) emailEl.value = '';
   if(passEl) passEl.value = '';
+}
+function mostrarBloqueoConexion(){
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('offlineLockScreen').style.display = '';
+}
+function ocultarBloqueoConexion(){
+  document.getElementById('offlineLockScreen').style.display = 'none';
+  document.getElementById('app').style.display = '';
+}
+window.mostrarBloqueoConexion = mostrarBloqueoConexion;
+window.ocultarBloqueoConexion = ocultarBloqueoConexion;
+function reintentarConexion(){
+  const err = document.getElementById('offlineLockError');
+  if(err) err.textContent = 'Comprobando conexión…';
+  if(typeof window.revalidarConexionManual === 'function'){
+    window.revalidarConexionManual().then(() => {
+      if(err) err.textContent = '';
+    });
+  }
 }
 
 const LS_PREFIX = 'taxi-cierre-app:';
@@ -2242,10 +2272,37 @@ window.firebaseLogout = function(){
   signOut(auth);
 };
 
+/* ---------- exigir conexión a internet al menos 1 vez cada 7 días ---------- */
+const OFFLINE_LIMIT_MS = 7 * 24 * 60 * 60 * 1000;
+const LAST_ONLINE_KEY = 'last-online-check';
+
+async function revalidarConexion(){
+  if(!auth.currentUser) return;
+  try{
+    await auth.currentUser.getIdToken(true); // fuerza comprobar contra el servidor, no usa caché local
+    localStorage.setItem(LAST_ONLINE_KEY, String(Date.now()));
+    if(typeof window.ocultarBloqueoConexion === 'function') window.ocultarBloqueoConexion();
+  }catch(e){
+    if(e && ['auth/user-disabled','auth/user-token-expired','auth/user-not-found','auth/invalid-user-token'].includes(e.code)){
+      signOut(auth); // la cuenta ya no es válida: cerrar sesión de verdad
+      return;
+    }
+    // Probablemente sin conexión: comprobamos si se ha superado el plazo permitido
+    const last = Number(localStorage.getItem(LAST_ONLINE_KEY) || 0);
+    if(!last || (Date.now() - last) > OFFLINE_LIMIT_MS){
+      if(typeof window.mostrarBloqueoConexion === 'function') window.mostrarBloqueoConexion();
+    }
+  }
+}
+window.revalidarConexionManual = revalidarConexion;
+setInterval(revalidarConexion, 6 * 60 * 60 * 1000); // reintenta cada 6h mientras la app siga abierta
+window.addEventListener('online', revalidarConexion);
+
 onAuthStateChanged(auth, (user) => {
   if(user){
     if(typeof window.showApp === 'function') window.showApp();
     if(typeof window.loadData === 'function') window.loadData();
+    revalidarConexion();
   } else {
     if(typeof window.hideApp === 'function') window.hideApp();
   }

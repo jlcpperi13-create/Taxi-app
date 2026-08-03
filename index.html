@@ -272,6 +272,7 @@ let state = {
   gastoTipo: 'diario',
   gastoPrefillFecha: null,
   skipPrefill: false,
+  cierreDraft: null,
   mesActual: null,
   workDate: null,
   lastTaxi: '',
@@ -631,11 +632,19 @@ function setDriver(d){
 function renderCierreTab(c){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
   const d = editing || { fecha: state.workDate || todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: state.pctEmpresa };
-  if(!editing && !state.skipPrefill){
-    const facturadoDia = round2(todayMeter(d.chofer, d.fecha).facturado);
-    if(facturadoDia > 0) d.facturado = facturadoDia;
+  if(!editing){
+    if(!state.cierreDraft){
+      state.cierreDraft = { fecha: d.fecha, clientes:'', facturado:'', kmInicio:'', kmFin:'' };
+      if(!state.skipPrefill){
+        const facturadoDia = round2(todayMeter(d.chofer, d.fecha).facturado);
+        if(facturadoDia > 0) state.cierreDraft.facturado = facturadoDia;
+      }
+      const ultimoKm = ultimoKmFinCierre();
+      if(ultimoKm) state.cierreDraft.kmInicio = ultimoKm;
+      state.skipPrefill = false;
+    }
+    Object.assign(d, state.cierreDraft);
   }
-  state.skipPrefill = false;
   const calc = cierreCalc(d);
 
   c.innerHTML = `
@@ -651,7 +660,7 @@ function renderCierreTab(c){
       <input type="hidden" id="f-chofer" value="${d.chofer}">
       <div class="row2 field">
         <div><label>Fecha</label><input type="date" id="f-fecha" value="${d.fecha}" onchange="onFechaCierreChange()"></div>
-        <div><label>Clientes</label><input type="number" id="f-clientes" value="${d.clientes}" placeholder="0"></div>
+        <div><label>Clientes</label><input type="number" id="f-clientes" value="${d.clientes}" placeholder="0" oninput="liveCalc()"></div>
       </div>
       <div class="field"><label>Facturado total (€)</label><input type="number" step="0.01" id="f-facturado" value="${d.facturado}" placeholder="0.00" oninput="liveCalc()"></div>
       <div class="row2 field">
@@ -818,6 +827,7 @@ function liveCalc(){
   const d = {
     fecha: document.getElementById('f-fecha').value || todayISO(),
     chofer: document.getElementById('f-chofer').value,
+    clientes: document.getElementById('f-clientes').value,
     facturado: document.getElementById('f-facturado').value,
     kmInicio: document.getElementById('f-kmInicio').value,
     kmFin: document.getElementById('f-kmFin').value,
@@ -825,6 +835,9 @@ function liveCalc(){
     serviciosArchivados: editing ? editing.serviciosArchivados : undefined,
     gastosArchivados: editing ? editing.gastosArchivados : undefined,
   };
+  if(!editing){
+    state.cierreDraft = { fecha: d.fecha, clientes: d.clientes, facturado: d.facturado, kmInicio: d.kmInicio, kmFin: d.kmFin };
+  }
   const calc = cierreCalc(d);
   document.getElementById('calc-efectivo').textContent = `€${fmt(calc.efectivo)}`;
   document.getElementById('calc-tarjeta').textContent = `−€${fmt(calc.tarjetaBoxTotal)}`;
@@ -921,7 +934,7 @@ async function saveCierre(id, stampNow){
     state.cierres.push(d);
   }
   state.editingCierreId = null;
-  if(wasNew){ state.skipPrefill = true; state.workDate = null; }
+  if(wasNew){ state.skipPrefill = true; state.workDate = null; state.cierreDraft = null; }
   await saveCierres();
   await saveServicios();
   await saveGastos();

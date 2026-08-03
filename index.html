@@ -154,7 +154,14 @@ input,select{font-family:inherit;}
 </head>
 <body>
 
-<div class="lock-screen" id="lockScreen">
+<div class="lock-screen" id="splashScreen">
+  <div class="lock-box">
+    <div class="lock-icon">📖</div>
+    <div class="lock-title display">MiContable</div>
+  </div>
+</div>
+
+<div class="lock-screen" id="lockScreen" style="display:none;">
   <div class="lock-box">
     <div class="lock-icon">🔒</div>
     <div class="lock-title display">Acceso privado</div>
@@ -181,10 +188,12 @@ input,select{font-family:inherit;}
 <script>
 /* ---------- pantalla de acceso (mostrar/ocultar) ---------- */
 function showApp(){
+  document.getElementById('splashScreen').style.display = 'none';
   document.getElementById('lockScreen').style.display = 'none';
   document.getElementById('app').style.display = '';
 }
 function hideApp(){
+  document.getElementById('splashScreen').style.display = 'none';
   document.getElementById('lockScreen').style.display = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('offlineLockScreen').style.display = 'none';
@@ -277,6 +286,18 @@ let state = {
   editRequiereMaster: false,
   pendingEditCierreId: null,
 };
+
+/* ---------- apertura optimista ----------
+   Si la última vez que se usó la app había una sesión iniciada, mostramos la app
+   al instante (los datos ya están guardados en este móvil, no hace falta esperar
+   a Firebase para leerlos). Firebase confirma en segundo plano; si resultara que la
+   sesión ya no es válida, entonces sí se vuelve a la pantalla de acceso. */
+try{
+  if(localStorage.getItem('mc-had-session') === '1' && typeof showApp === 'function'){
+    showApp();
+    loadData();
+  }
+}catch(e){ /* almacenamiento no disponible: se espera a Firebase con normalidad */ }
 
 const PROTECTED_TABS = ['cierre'];
 const MASTER_TABS = ['ajustes','mensual','anual'];
@@ -2316,10 +2337,12 @@ window.addEventListener('online', revalidarConexion);
 
 onAuthStateChanged(auth, (user) => {
   if(user){
+    try{ localStorage.setItem('mc-had-session', '1'); }catch(e){}
     if(typeof window.showApp === 'function') window.showApp();
     if(typeof window.loadData === 'function') window.loadData();
     revalidarConexion();
   } else {
+    try{ localStorage.removeItem('mc-had-session'); }catch(e){}
     if(typeof window.hideApp === 'function') window.hideApp();
   }
 });

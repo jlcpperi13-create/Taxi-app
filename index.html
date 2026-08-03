@@ -133,6 +133,9 @@ input,select{font-family:inherit;}
 .nav-btn.active{color:var(--amber);}
 .nav-btn .icon{width:20px; height:20px;}
 .nav-btn .lbl{font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-family:'Barlow Condensed'; font-weight:600;}
+.nav-badge{position:absolute; top:4px; right:calc(50% - 17px); width:9px; height:9px; border-radius:50%; border:2px solid var(--bg);}
+.nav-badge.amarillo{background:var(--amber);}
+.nav-badge.rojo{background:var(--coral);}
 
 .toast{position:fixed; bottom:78px; left:50%; transform:translateX(-50%); background:var(--surface-3); border:1px solid var(--hair); color:var(--ink); padding:9px 16px; border-radius:20px; font-size:13px; z-index:50; opacity:0; transition:opacity 0.25s;}
 .toast.show{opacity:1;}
@@ -576,7 +579,7 @@ function render(){
         ${navBtn('servicios','Servicios', icon('list'))}
         ${navBtn('cierre','Cierre', icon('meter'))}
         ${navBtn('gastos','Gastos', icon('wallet'))}
-        ${navBtn('mantenimiento','Manten.', icon('wrench'))}
+        ${navBtn('mantenimiento','Manten.', icon('wrench'), estadoGlobalMantenimiento())}
         ${navBtn('mensual','Mensual', icon('calendar'))}
         ${navBtn('anual','Anual', icon('chart'))}
         ${navBtn('ajustes','Ajustes', icon('settings'))}
@@ -586,8 +589,21 @@ function render(){
   renderContent();
 }
 
-function navBtn(id, label, svg){
-  return `<button class="nav-btn ${state.tab===id?'active':''}" onclick="setTab('${id}')">${svg}<span class="lbl">${label}</span></button>`;
+function navBtn(id, label, svg, badge){
+  const dot = badge ? `<span class="nav-badge ${badge}"></span>` : '';
+  return `<button class="nav-btn ${state.tab===id?'active':''}" onclick="setTab('${id}')" style="position:relative;">${svg}${dot}<span class="lbl">${label}</span></button>`;
+}
+function estadoGlobalMantenimiento(){
+  const kmActual = kmActualEstimado();
+  const hoy = todayISO();
+  let peor = null;
+  state.mantenimientos.forEach(m => {
+    mantenimientoAvisos(m, kmActual, hoy).forEach(a => {
+      if(a.cls === 'anulado') peor = 'rojo';
+      else if(a.cls === 'pend' && peor !== 'rojo') peor = 'amarillo';
+    });
+  });
+  return peor;
 }
 function icon(name){
   const icons = {

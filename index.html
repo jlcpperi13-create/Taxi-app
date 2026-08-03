@@ -287,19 +287,6 @@ let state = {
   pendingEditCierreId: null,
 };
 
-/* ---------- apertura optimista ----------
-   Si la última vez que se usó la app había una sesión iniciada, mostramos la app
-   al instante (los datos ya están guardados en este móvil, no hace falta esperar
-   a Firebase para leerlos). Firebase confirma en segundo plano; si resultara que la
-   sesión ya no es válida, entonces sí se vuelve a la pantalla de acceso. */
-try{
-  if(localStorage.getItem('mc-had-session') === '1' && typeof showApp === 'function'){
-    showApp();
-    loadData();
-    window.__mcOpenedOptimistically = true;
-  }
-}catch(e){ /* almacenamiento no disponible: se espera a Firebase con normalidad */ }
-
 const PROTECTED_TABS = ['cierre'];
 const MASTER_TABS = ['ajustes','mensual','anual'];
 function driverIndex(name){ return state.drivers.indexOf(name); }
@@ -2241,6 +2228,19 @@ setInterval(() => {
 
 /* ---------- init ---------- */
 /* loadData() se llama automáticamente cuando Firebase confirma la sesión iniciada (ver script type="module" al final) */
+
+/* ---------- apertura optimista ----------
+   Si la última vez que se usó la app había una sesión iniciada, mostramos la app
+   al instante (los datos ya están guardados en este móvil, no hace falta esperar
+   a Firebase para leerlos). Firebase confirma en segundo plano; si resultara que la
+   sesión ya no es válida, entonces sí se vuelve a la pantalla de acceso. */
+try{
+  if(localStorage.getItem('mc-had-session') === '1'){
+    showApp();
+    loadData();
+    window.__mcOpenedOptimistically = true;
+  }
+}catch(e){ /* almacenamiento no disponible: se espera a Firebase con normalidad */ }
 </script>
 </body>
 <script>

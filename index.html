@@ -296,6 +296,7 @@ try{
   if(localStorage.getItem('mc-had-session') === '1' && typeof showApp === 'function'){
     showApp();
     loadData();
+    window.__mcOpenedOptimistically = true;
   }
 }catch(e){ /* almacenamiento no disponible: se espera a Firebase con normalidad */ }
 
@@ -2338,8 +2339,10 @@ window.addEventListener('online', revalidarConexion);
 onAuthStateChanged(auth, (user) => {
   if(user){
     try{ localStorage.setItem('mc-had-session', '1'); }catch(e){}
-    if(typeof window.showApp === 'function') window.showApp();
-    if(typeof window.loadData === 'function') window.loadData();
+    if(!window.__mcOpenedOptimistically){
+      if(typeof window.showApp === 'function') window.showApp();
+      if(typeof window.loadData === 'function') window.loadData();
+    }
     revalidarConexion();
   } else {
     try{ localStorage.removeItem('mc-had-session'); }catch(e){}

@@ -270,8 +270,6 @@ let state = {
   loaded: false,
   editingCierreId: null,
   editingServicioId: null,
-  editingServicioArchivadoId: null,
-  editingGastoArchivadoId: null,
   editingGastoId: null,
   editingMantenimientoId: null,
   gastoTipo: 'diario',
@@ -503,14 +501,14 @@ function cierreCalc(d){
   gastos.autopistaTarjeta = round2(gastos.autopistaTarjeta + autopistaEnServicios);
   gastos.autopista = round2(gastos.autopistaEfectivo + gastos.autopistaTarjeta);
   const gastosEfectivo = round2(gastos.gasolina + gastos.otros);
-  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - gastos.autopistaTarjeta);
+  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - gastos.autopistaTarjeta + gastos.autopista);
   const kmJornada = Math.max(0, kmFin - kmInicio);
   const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
   const pct = (+d.pctEmpresa || state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = round2(choferBase + propinas);
-  const efectivoEmpresa = round2(efectivo - choferBase + gastos.autopista);
+  const efectivoEmpresa = round2(efectivo - choferBase);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
   return { facturado, cardServicios, tarjetaBoxTotal, propinas, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
 }
@@ -619,7 +617,7 @@ function icon(name){
   };
   return icons[name];
 }
-function setTab(id){ state.editingCierreId = null; state.editingServicioId = null; state.editingServicioArchivadoId = null; state.editingGastoId = null; state.editingGastoArchivadoId = null; state.editingMantenimientoId = null; irATab(id); render(); }
+function setTab(id){ state.editingCierreId = null; state.editingServicioId = null; state.editingGastoId = null; state.editingMantenimientoId = null; irATab(id); render(); }
 
 /* ---------- CIERRE TAB ---------- */
 function renderContent(){
@@ -737,19 +735,17 @@ function renderCierreTab(c){
     </div>
 
     ${editing && Array.isArray(editing.serviciosArchivados) && editing.serviciosArchivados.length ? `
-    <div class="card" id="servicios-archivados-card">
+    <div class="card">
       <div class="subhead">Servicios de este cierre (${editing.serviciosArchivados.length})</div>
       <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos servicios quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Servicios.</div></details>
-      ${archivedServicioEditFormHTML(editing)}
-      ${editing.serviciosArchivados.map(s => archivedServicioRowHTML(s, editing.id)).join('')}
+      ${editing.serviciosArchivados.map(archivedServicioRowHTML).join('')}
     </div>` : ''}
 
     ${editing && Array.isArray(editing.gastosArchivados) && editing.gastosArchivados.length ? `
-    <div class="card" id="gastos-archivados-card">
+    <div class="card">
       <div class="subhead">Gastos de este cierre (${editing.gastosArchivados.length})</div>
-      <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos gastos quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Gastos. Puedes tocarlos para editarlos o eliminarlos.</div></details>
-      ${archivedGastoEditFormHTML(editing)}
-      ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, editing.id, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO])).join('')}
+      <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos gastos quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Gastos.</div></details>
+      ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO])).join('')}
     </div>` : ''}
 
     ${editing && Array.isArray(editing.historialEdiciones) && editing.historialEdiciones.length ? `
@@ -800,11 +796,10 @@ function cierreRowHTML(d){
   </div>`;
 }
 
-function archivedServicioRowHTML(s, cierreId){
-  if(state.editingServicioArchivadoId === s.id) return '';
+function archivedServicioRowHTML(s){
   const dt = new Date(s.fecha + 'T00:00:00');
   const propina = +s.propina || 0;
-  return `<div class="entry" onclick="editServicioArchivado('${cierreId}','${s.id}')" style="cursor:pointer;">
+  return `<div class="entry">
     <div class="entry-top">
       <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
@@ -818,143 +813,6 @@ function archivedServicioRowHTML(s, cierreId){
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
     </div>
   </div>`;
-}
-
-function archivedServicioEditFormHTML(editing){
-  if(!state.editingServicioArchivadoId) return '';
-  const orig = (editing.serviciosArchivados || []).find(x => x.id === state.editingServicioArchivadoId);
-  if(!orig) return '';
-  const s = { ...orig, importe: (orig.precioBase != null ? orig.precioBase : orig.importe), descuentoPct: orig.descuentoPct || '' };
-  return `
-  <div class="card" style="background:var(--bg-alt,rgba(255,255,255,.04)); margin-bottom:10px;">
-    <div class="subhead">Editar servicio archivado</div>
-    <div class="row2 field">
-      <div><label>Fecha</label><input type="date" id="sa-fecha" value="${s.fecha}"></div>
-      <div><label>Hora</label><input type="time" id="sa-hora" value="${s.hora || ''}"></div>
-    </div>
-    <div class="row2 field">
-      <div><label>Nº taxi</label><input type="text" id="sa-taxi" value="${s.taxi || ''}" placeholder="Nº de taxi"></div>
-      <div><label>Cliente (opcional)</label><input type="text" id="sa-cliente" value="${s.cliente || ''}" placeholder="Nombre del cliente"></div>
-    </div>
-    <div class="row2 field">
-      <div><label>Origen</label><input type="text" id="sa-origen" value="${s.origen || ''}" placeholder="Punto de recogida"></div>
-      <div><label>Destino</label><input type="text" id="sa-destino" value="${s.destino || ''}" placeholder="Punto de destino"></div>
-    </div>
-    <div class="row2 field">
-      <div><label>Importe (€)</label><input type="number" step="0.01" id="sa-importe" value="${s.importe}" placeholder="0.00" oninput="previewDescuentoArchivado()"></div>
-      <div><label>Descuento (%)</label><input type="number" step="0.01" id="sa-descuento" value="${s.descuentoPct}" placeholder="0" oninput="previewDescuentoArchivado()"></div>
-    </div>
-    <div class="field" id="sa-descuento-preview-wrap" style="display:${s.descuentoPct ? 'block':'none'}; margin-top:-6px;">
-      <div class="notice" id="sa-descuento-preview">Importe final: €${fmt(round2((+s.importe||0) * (1 - (+s.descuentoPct||0)/100)))}</div>
-    </div>
-    <div class="row2 field">
-      <div>
-        <label>Forma de pago</label>
-        <select id="sa-pago" onchange="toggleAutopistaIncluidaArchivado()">
-          <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
-          <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
-          <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
-        </select>
-      </div>
-      <div>
-        <label>&nbsp;</label>
-        <button class="btn btn-primary" style="width:100%;" onclick="saveServicioArchivado('${editing.id}')">Guardar cambios</button>
-      </div>
-    </div>
-    <div class="field" id="sa-autopista-incluida-wrap" style="display:${s.pago!=='efectivo' ? 'block':'none'};">
-      <label>Autopista incluida en este cobro (€)</label>
-      <input type="number" step="0.01" id="sa-autopista-incluida" value="${s.autopistaIncluida || ''}" placeholder="0.00">
-    </div>
-    <div class="btn-row"><button class="btn btn-danger" onclick="deleteServicioArchivadoConfirm('${editing.id}')">Eliminar</button></div>
-    <button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingServicioArchivadoId=null; render();">Cancelar</button>
-    <div class="field" style="margin-top:14px;"><label>Propina / redondeo cobrado de más (€)</label><input type="number" step="0.01" id="sa-propina" value="${s.propina || ''}" placeholder="0.00"></div>
-    <div class="field"><label>Estado</label>
-      <select id="sa-estado">
-        <option value="pag" ${s.estado==='pag'?'selected':''}>Pagado</option>
-        <option value="pend" ${s.estado==='pend'?'selected':''}>Pendiente</option>
-        <option value="anulado" ${s.estado==='anulado'?'selected':''}>Anulado</option>
-      </select>
-    </div>
-  </div>`;
-}
-
-function toggleAutopistaIncluidaArchivado(){
-  const pago = document.getElementById('sa-pago').value;
-  const wrap = document.getElementById('sa-autopista-incluida-wrap');
-  if(wrap) wrap.style.display = pago !== 'efectivo' ? 'block' : 'none';
-}
-
-function previewDescuentoArchivado(){
-  const importeEl = document.getElementById('sa-importe');
-  const descuentoEl = document.getElementById('sa-descuento');
-  const wrap = document.getElementById('sa-descuento-preview-wrap');
-  const preview = document.getElementById('sa-descuento-preview');
-  if(!importeEl || !descuentoEl || !wrap || !preview) return;
-  const base = +importeEl.value || 0;
-  const pct = +descuentoEl.value || 0;
-  if(pct > 0 && base > 0){
-    wrap.style.display = 'block';
-    preview.textContent = `Importe final: €${fmt(round2(base * (1 - pct/100)))}`;
-  } else {
-    wrap.style.display = 'none';
-  }
-}
-
-function editServicioArchivado(cierreId, servicioId){
-  state.editingServicioArchivadoId = servicioId;
-  render();
-  const card = document.getElementById('servicios-archivados-card');
-  if(card) card.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-async function saveServicioArchivado(cierreId){
-  const cierre = state.cierres.find(x=>x.id===cierreId);
-  if(!cierre || !Array.isArray(cierre.serviciosArchivados)) return;
-  const idx = cierre.serviciosArchivados.findIndex(x=>x.id===state.editingServicioArchivadoId);
-  if(idx === -1) return;
-  const importeVal = document.getElementById('sa-importe').value;
-  if(!importeVal || +importeVal <= 0){ showToast('Indica el importe'); return; }
-  const pago = document.getElementById('sa-pago').value;
-  const propinaVal = document.getElementById('sa-propina').value;
-  const descuentoPct = round2(document.getElementById('sa-descuento').value || 0);
-  const precioBase = round2(importeVal);
-  const importeFinal = round2(precioBase * (1 - descuentoPct/100));
-  const autopistaIncluidaEl = document.getElementById('sa-autopista-incluida');
-  const autopistaIncluida = (pago !== 'efectivo' && autopistaIncluidaEl && autopistaIncluidaEl.value) ? round2(autopistaIncluidaEl.value) : '';
-  const orig = cierre.serviciosArchivados[idx];
-  cierre.serviciosArchivados[idx] = {
-    ...orig,
-    fecha: document.getElementById('sa-fecha').value || orig.fecha,
-    hora: document.getElementById('sa-hora').value || '',
-    cliente: document.getElementById('sa-cliente').value.trim(),
-    origen: document.getElementById('sa-origen').value.trim(),
-    destino: document.getElementById('sa-destino').value.trim(),
-    precioBase,
-    descuentoPct,
-    importe: importeFinal,
-    pago,
-    autopistaIncluida,
-    propina: pago !== 'efectivo' && propinaVal ? round2(propinaVal) : '',
-    estado: document.getElementById('sa-estado').value,
-    taxi: document.getElementById('sa-taxi').value.trim(),
-  };
-  cierre.historialEdiciones = Array.isArray(cierre.historialEdiciones) ? [...cierre.historialEdiciones] : [];
-  cierre.historialEdiciones.push({ ts: new Date().toISOString(), chofer: state.driver, viaMaster: !!(state.editRequiereMaster && state.masterPinUnlocked) });
-  state.editingServicioArchivadoId = null;
-  await saveCierres();
-  showToast('Servicio actualizado');
-  render();
-}
-
-async function deleteServicioArchivadoConfirm(cierreId){
-  if(!confirm('¿Eliminar este servicio archivado?')) return;
-  const cierre = state.cierres.find(x=>x.id===cierreId);
-  if(!cierre || !Array.isArray(cierre.serviciosArchivados)) return;
-  cierre.serviciosArchivados = cierre.serviciosArchivados.filter(x=>x.id!==state.editingServicioArchivadoId);
-  state.editingServicioArchivadoId = null;
-  await saveCierres();
-  showToast('Servicio eliminado');
-  render();
 }
 
 function setPct(p){
@@ -1033,8 +891,6 @@ function editCierre(id){
     return;
   }
   state.editingCierreId = id;
-  state.editingServicioArchivadoId = null;
-  state.editingGastoArchivadoId = null;
   state.tab = 'cierre';
   render();
   window.scrollTo(0,0);
@@ -1094,8 +950,6 @@ async function saveCierre(id, stampNow){
     state.cierres.push(d);
   }
   state.editingCierreId = null;
-  state.editingServicioArchivadoId = null;
-  state.editingGastoArchivadoId = null;
   if(wasNew){ state.skipPrefill = true; state.workDate = null; state.cierreDraft = null; }
   await saveCierres();
   await saveServicios();
@@ -1121,8 +975,6 @@ async function deleteCierre(id){
   }
   state.cierres = state.cierres.filter(x=>x.id!==id);
   state.editingCierreId = null;
-  state.editingServicioArchivadoId = null;
-  state.editingGastoArchivadoId = null;
   await saveCierres();
   const partes = [];
   if(serviciosRestaurados.length) partes.push(`${serviciosRestaurados.length} servicio(s)`);
@@ -1226,81 +1078,15 @@ function gastoRowHTML(g, cats){
   </div>`;
 }
 
-function archivedGastoRowHTML(g, cierreId, cats){
-  if(state.editingGastoArchivadoId === g.id) return '';
+function archivedGastoRowHTML(g, cats){
   const dt = new Date(g.fecha + 'T00:00:00');
-  return `<div class="entry" onclick="editGastoArchivado('${cierreId}','${g.id}')" style="cursor:pointer;">
+  return `<div class="entry">
     <div class="entry-top">
       <div class="entry-date">${catLabel(cats, g.categoria)} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
       <div class="entry-amount">€${fmt(+g.importe||0)}</div>
     </div>
     <div class="entry-meta">${g.nota || 'Sin nota'}</div>
   </div>`;
-}
-
-function archivedGastoEditFormHTML(editing){
-  if(!state.editingGastoArchivadoId) return '';
-  const orig = (editing.gastosArchivados || []).find(x => x.id === state.editingGastoArchivadoId);
-  if(!orig) return '';
-  const cats = CAT_DIARIO_LEGACY.some(c=>c.id===orig.categoria) ? [...CAT_DIARIO, ...CAT_DIARIO_LEGACY] : CAT_DIARIO;
-  return `
-  <div class="card" style="background:var(--bg-alt,rgba(255,255,255,.04)); margin-bottom:10px;">
-    <div class="subhead">Editar gasto archivado</div>
-    <div class="field"><label>Fecha</label><input type="date" id="ga-fecha" value="${orig.fecha}"></div>
-    <div class="field"><label>Categoría</label>
-      <select id="ga-categoria">
-        ${cats.map(cat => `<option value="${cat.id}" ${orig.categoria===cat.id?'selected':''}>${cat.label}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label>Importe (€)</label><input type="number" step="0.01" id="ga-importe" value="${orig.importe}" placeholder="0.00"></div>
-    <div class="field"><label>Nota (opcional)</label><input type="text" id="ga-nota" value="${orig.nota||''}" placeholder="Detalle, proveedor, referencia…"></div>
-    <div class="btn-row">
-      <button class="btn btn-danger" onclick="deleteGastoArchivadoConfirm('${editing.id}')">Eliminar</button>
-      <button class="btn btn-primary" onclick="saveGastoArchivado('${editing.id}')">Guardar cambios</button>
-    </div>
-    <button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingGastoArchivadoId=null; render();">Cancelar</button>
-  </div>`;
-}
-
-function editGastoArchivado(cierreId, gastoId){
-  state.editingGastoArchivadoId = gastoId;
-  render();
-  const card = document.getElementById('gastos-archivados-card');
-  if(card) card.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-async function saveGastoArchivado(cierreId){
-  const cierre = state.cierres.find(x=>x.id===cierreId);
-  if(!cierre || !Array.isArray(cierre.gastosArchivados)) return;
-  const idx = cierre.gastosArchivados.findIndex(x=>x.id===state.editingGastoArchivadoId);
-  if(idx === -1) return;
-  const importe = document.getElementById('ga-importe').value;
-  if(!importe || +importe <= 0){ showToast('Indica un importe'); return; }
-  const orig = cierre.gastosArchivados[idx];
-  cierre.gastosArchivados[idx] = {
-    ...orig,
-    fecha: document.getElementById('ga-fecha').value || orig.fecha,
-    categoria: document.getElementById('ga-categoria').value,
-    importe: round2(importe),
-    nota: document.getElementById('ga-nota').value.trim(),
-  };
-  cierre.historialEdiciones = Array.isArray(cierre.historialEdiciones) ? [...cierre.historialEdiciones] : [];
-  cierre.historialEdiciones.push({ ts: new Date().toISOString(), chofer: state.driver, viaMaster: !!(state.editRequiereMaster && state.masterPinUnlocked) });
-  state.editingGastoArchivadoId = null;
-  await saveCierres();
-  showToast('Gasto actualizado');
-  render();
-}
-
-async function deleteGastoArchivadoConfirm(cierreId){
-  if(!confirm('¿Eliminar este gasto archivado?')) return;
-  const cierre = state.cierres.find(x=>x.id===cierreId);
-  if(!cierre || !Array.isArray(cierre.gastosArchivados)) return;
-  cierre.gastosArchivados = cierre.gastosArchivados.filter(x=>x.id!==state.editingGastoArchivadoId);
-  state.editingGastoArchivadoId = null;
-  await saveCierres();
-  showToast('Gasto eliminado');
-  render();
 }
 
 function editGasto(id){ state.editingGastoId = id; render(); window.scrollTo(0,0); }

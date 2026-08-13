@@ -1699,7 +1699,7 @@ function renderMensualTab(c){
   }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
   totals.dias = fechasUnicas.size;
 
-  const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
+  const serviciosTotal = serviciosMes.length;
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
   const esMesActual = mes === monthKey(todayISO());
 
@@ -1750,7 +1750,7 @@ function renderMensualTab(c){
       </div>
       <div class="row2" style="margin-bottom:10px;">
         <div class="meter-cell"><div class="label">Autopista</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
-        <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">€${fmt(serviciosTotal)}</div></div>
+        <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${serviciosTotal}</div></div>
       </div>
       <div class="subhead" style="margin-top:4px;">Desglose de gastos variables</div>
       <div class="row2" style="margin-bottom:10px;">
@@ -1818,7 +1818,7 @@ function renderAnualTab(c){
   });
   todosLosServicios().filter(s => s.estado !== 'anulado').forEach(s => {
     const k = monthKey(s.fecha);
-    ensure(k).servicios += (+s.importe || 0);
+    ensure(k).servicios += 1;
   });
 
   const months = Object.keys(byMonth).sort().reverse();
@@ -1872,7 +1872,7 @@ function renderAnualTab(c){
         </div>
         <div class="row2" style="margin-bottom:10px;">
           <div class="meter-cell"><div class="label">Autopista</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
-          <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">€${fmt(totals.servicios)}</div></div>
+          <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${totals.servicios}</div></div>
         </div>
         <div class="subhead" style="margin-top:4px;">Desglose de gastos variables</div>
         <div class="row2" style="margin-bottom:10px;">
@@ -2033,7 +2033,7 @@ function seccionesDesdeTotales(totals, extra){
       ['Gastos variables', `€${fmt(totals.gastosVar)}`],
       ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
       ['Autopista', `€${fmt(totals.autopista)}`],
-      ['Servicios', `€${fmt(extra.servicios)}`],
+      ['Servicios', `${extra.servicios}`],
       ['— Gasolina', `€${fmt(totals.gasolina)}`],
       ['— Gastos tarjeta', `€${fmt(totals.gastosTarjeta)}`],
       ['— Otros gastos', `€${fmt(totals.otrosGastos)}`],
@@ -2073,7 +2073,7 @@ function totalesMes(mes){
     return acc;
   }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
   totals.dias = fechasUnicas.size;
-  const serviciosTotal = serviciosMes.reduce((s,x)=> s + (+x.importe||0), 0);
+  const serviciosTotal = serviciosMes.length;
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
   return { totals, extra: { servicios: serviciosTotal, gastosFijos: gastosFijosTotal } };
 }
@@ -2140,7 +2140,7 @@ function totalesAnio(year){
     ensure(monthKey(g.fecha)).gastosFijos += (+g.importe || 0);
   });
   todosLosServicios().filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
-    ensure(monthKey(s.fecha)).servicios += (+s.importe || 0);
+    ensure(monthKey(s.fecha)).servicios += 1;
   });
   const months = Object.keys(byMonth).sort();
   const totals = months.reduce((acc,m)=>{

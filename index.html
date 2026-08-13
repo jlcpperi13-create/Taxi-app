@@ -272,6 +272,7 @@ let state = {
   editingServicioId: null,
   editingGastoId: null,
   editingServicioArchivadoId: null,
+  editingGastoArchivadoId: null,
   editingMantenimientoId: null,
   gastoTipo: 'diario',
   gastoPrefillFecha: null,
@@ -618,7 +619,7 @@ function icon(name){
   };
   return icons[name];
 }
-function setTab(id){ state.editingCierreId = null; state.editingServicioId = null; state.editingGastoId = null; state.editingMantenimientoId = null; state.editingServicioArchivadoId = null; irATab(id); render(); }
+function setTab(id){ state.editingCierreId = null; state.editingServicioId = null; state.editingGastoId = null; state.editingMantenimientoId = null; state.editingServicioArchivadoId = null; state.editingGastoArchivadoId = null; irATab(id); render(); }
 
 /* ---------- CIERRE TAB ---------- */
 function renderContent(){
@@ -746,8 +747,9 @@ function renderCierreTab(c){
     ${editing && Array.isArray(editing.gastosArchivados) && editing.gastosArchivados.length ? `
     <div class="card">
       <div class="subhead">Gastos de este cierre (${editing.gastosArchivados.length})</div>
-      <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos gastos quedaron archivados dentro de este cierre y ya no aparecen en la pestaña Gastos.</div></details>
-      ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO])).join('')}
+      <details class="notice-toggle" style="margin-bottom:10px;"><summary>Info</summary><div class="notice">Estos gastos quedaron archivados dentro de este cierre. Toca uno para editarlo o eliminarlo.</div></details>
+      ${state.editingGastoArchivadoId ? gastoArchivadoFormHTML(editing) : ''}
+      ${editing.gastosArchivados.map(g => archivedGastoRowHTML(g, [...CAT_DIARIO, ...CAT_DIARIO_LEGACY, ...CAT_PERIODICO], editing.id)).join('')}
     </div>` : ''}
 
     ${editing && Array.isArray(editing.historialEdiciones) && editing.historialEdiciones.length ? `
@@ -762,7 +764,7 @@ function renderCierreTab(c){
       ${editing ? `<button class="btn btn-danger" onclick="deleteCierre('${editing.id}')">Eliminar</button>` : ''}
       <button class="btn btn-primary" onclick="saveCierre(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Registrar cierre'}</button>
     </div>
-    ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingCierreId=null; state.editingServicioArchivadoId=null; render();">Cancelar</button>` : ''}
+    ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingCierreId=null; state.editingServicioArchivadoId=null; state.editingGastoArchivadoId=null; render();">Cancelar</button>` : ''}
 
     <div class="section-title" style="margin-top:24px;">Historial</div>
     <div class="card" style="padding:4px 16px;">
@@ -1185,15 +1187,81 @@ function gastoRowHTML(g, cats){
   </div>`;
 }
 
-function archivedGastoRowHTML(g, cats){
+function archivedGastoRowHTML(g, cats, cierreId){
   const dt = new Date(g.fecha + 'T00:00:00');
-  return `<div class="entry">
+  return `<div class="entry" onclick="editGastoArchivado('${cierreId}','${g.id}')" style="cursor:pointer;">
     <div class="entry-top">
       <div class="entry-date">${catLabel(cats, g.categoria)} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}</span></div>
       <div class="entry-amount">€${fmt(+g.importe||0)}</div>
     </div>
     <div class="entry-meta">${g.nota || 'Sin nota'}</div>
   </div>`;
+}
+
+function gastoArchivadoFormHTML(cierre){
+  const g = cierre.gastosArchivados.find(x => x.id === state.editingGastoArchivadoId);
+  if(!g) return '';
+  const cats = g.tipo === 'diario' ? [...CAT_DIARIO, ...CAT_DIARIO_LEGACY] : CAT_PERIODICO;
+  return `
+  <div class="card" style="border-color:var(--amber-dim);">
+    <div class="subhead">Editar gasto archivado (${g.tipo === 'diario' ? 'diario' : 'periódico'})</div>
+    <div class="field"><label>Fecha</label><input type="date" id="ga-fecha" value="${g.fecha}"></div>
+    <div class="field"><label>Categoría</label>
+      ${g.tipo === 'periodico' ? `
+        <input list="ga-cat-list" id="ga-categoria" value="${catLabel(cats, g.categoria)}" placeholder="Elige o escribe una categoría">
+        <datalist id="ga-cat-list">${CAT_PERIODICO.map(cat => `<option value="${cat.label}">`).join('')}</datalist>
+      ` : `
+        <select id="ga-categoria">
+          ${cats.map(cat => `<option value="${cat.id}" ${g.categoria===cat.id?'selected':''}>${cat.label}</option>`).join('')}
+        </select>
+      `}
+    </div>
+    <div class="field"><label>Importe (€)</label><input type="number" step="0.01" id="ga-importe" value="${g.importe}" placeholder="0.00"></div>
+    <div class="field"><label>Nota (opcional)</label><input type="text" id="ga-nota" value="${g.nota||''}" placeholder="Detalle, proveedor, referencia…"></div>
+    <div class="btn-row">
+      <button class="btn btn-danger" onclick="deleteGastoArchivadoConfirm('${cierre.id}','${g.id}')">Eliminar</button>
+      <button class="btn btn-primary" onclick="saveGastoArchivado('${cierre.id}','${g.id}')">Guardar cambios</button>
+    </div>
+    <button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingGastoArchivadoId=null; render();">Cancelar</button>
+  </div>`;
+}
+
+function editGastoArchivado(cierreId, gastoId){
+  state.editingCierreId = cierreId;
+  state.editingGastoArchivadoId = gastoId;
+  render();
+}
+
+async function saveGastoArchivado(cierreId, gastoId){
+  const cierre = state.cierres.find(x => x.id === cierreId);
+  if(!cierre || !Array.isArray(cierre.gastosArchivados)) return;
+  const idx = cierre.gastosArchivados.findIndex(x => x.id === gastoId);
+  if(idx === -1) return;
+  const importe = document.getElementById('ga-importe').value;
+  if(!importe || +importe <= 0){ showToast('Indica un importe'); return; }
+  const prev = cierre.gastosArchivados[idx];
+  cierre.gastosArchivados[idx] = {
+    ...prev,
+    fecha: document.getElementById('ga-fecha').value || prev.fecha,
+    categoria: document.getElementById('ga-categoria').value,
+    importe: round2(importe),
+    nota: document.getElementById('ga-nota').value.trim(),
+  };
+  state.editingGastoArchivadoId = null;
+  await saveCierres();
+  showToast('Gasto actualizado');
+  render();
+}
+
+async function deleteGastoArchivadoConfirm(cierreId, gastoId){
+  if(!confirm('¿Eliminar este gasto del cierre?')) return;
+  const cierre = state.cierres.find(x => x.id === cierreId);
+  if(!cierre || !Array.isArray(cierre.gastosArchivados)) return;
+  cierre.gastosArchivados = cierre.gastosArchivados.filter(x => x.id !== gastoId);
+  state.editingGastoArchivadoId = null;
+  await saveCierres();
+  showToast('Gasto eliminado');
+  render();
 }
 
 function editGasto(id){ state.editingGastoId = id; render(); window.scrollTo(0,0); }

@@ -273,6 +273,8 @@ let state = {
   editingGastoId: null,
   editingServicioArchivadoId: null,
   editingGastoArchivadoId: null,
+  masterRecoveryStep: null,
+  masterRecoveryError: false,
   editingMantenimientoId: null,
   gastoTipo: 'diario',
   gastoPrefillFecha: null,
@@ -2182,6 +2184,9 @@ async function compartirPDFAnual(year){
 /* ---------- PIN LOCK ---------- */
 function renderPinLockTab(c){
   const esMaster = state.pinMode === 'master';
+  if(esMaster && state.masterRecoveryStep){
+    return renderMasterRecovery(c);
+  }
   const titulo = esMaster ? 'Introduce el PIN maestro' : `Introduce el PIN de ${state.driver}`;
   c.innerHTML = `
     <div class="card" style="text-align:center; padding:36px 20px;">
@@ -2194,9 +2199,86 @@ function renderPinLockTab(c){
         value="${state.pinInput || ''}" oninput="onPinInput(this.value)" onkeydown="if(event.key==='Enter') verificarPin()">
       ${state.pinError ? `<div style="color:#c23b3b; font-size:12px; margin-bottom:10px;">PIN incorrecto</div>` : ''}
       <button class="btn btn-primary" style="width:140px; display:block; margin:0 auto;" onclick="verificarPin()">Desbloquear</button>
+      ${esMaster ? `<button class="btn btn-ghost" style="width:auto; margin-top:16px; padding:6px 12px; font-size:12.5px;" onclick="iniciarRecuperacionMasterPin()">¿Olvidaste el PIN maestro?</button>` : ''}
     </div>
   `;
   setTimeout(() => { const el = document.getElementById('pin-input'); if(el) el.focus(); }, 50);
+}
+function iniciarRecuperacionMasterPin(){
+  state.masterRecoveryStep = 'password';
+  state.masterRecoveryError = false;
+  state.masterRecoveryPassword = '';
+  render();
+}
+function cancelarRecuperacionMasterPin(){
+  state.masterRecoveryStep = null;
+  state.masterRecoveryError = false;
+  state.masterRecoveryPassword = '';
+  render();
+}
+function renderMasterRecovery(c){
+  if(state.masterRecoveryStep === 'password'){
+    c.innerHTML = `
+      <div class="card" style="text-align:center; padding:36px 20px;">
+        <div style="font-size:38px; margin-bottom:8px;">🔑</div>
+        <div class="subhead" style="margin-bottom:4px;">Recuperar PIN maestro</div>
+        <div style="font-size:13px; color:var(--muted); margin-bottom:20px;">Introduce la contraseña de tu cuenta (la que usas para iniciar sesión) para confirmar que eres el titular.</div>
+        <input id="recovery-password" type="password" autocomplete="current-password" placeholder="Contraseña de tu cuenta"
+          style="width:220px; text-align:center; font-size:16px; padding:10px; border-radius:8px; border:1px solid ${state.masterRecoveryError ? '#c23b3b' : '#ccc'}; margin-bottom:12px;"
+          onkeydown="if(event.key==='Enter') verificarPasswordRecuperacion()">
+        ${state.masterRecoveryError ? `<div style="color:#c23b3b; font-size:12px; margin-bottom:10px;">Contraseña incorrecta</div>` : ''}
+        <button class="btn btn-primary" style="width:220px; display:block; margin:0 auto;" onclick="verificarPasswordRecuperacion()">Verificar</button>
+        <button class="btn btn-ghost" style="width:auto; margin-top:14px; padding:6px 12px; font-size:12.5px;" onclick="cancelarRecuperacionMasterPin()">Cancelar</button>
+      </div>
+    `;
+    setTimeout(() => { const el = document.getElementById('recovery-password'); if(el) el.focus(); }, 50);
+    return;
+  }
+  if(state.masterRecoveryStep === 'newpin'){
+    c.innerHTML = `
+      <div class="card" style="text-align:center; padding:36px 20px;">
+        <div style="font-size:38px; margin-bottom:8px;">🔑</div>
+        <div class="subhead" style="margin-bottom:4px;">Nuevo PIN maestro</div>
+        <div style="font-size:13px; color:var(--muted); margin-bottom:20px;">Identidad confirmada. Establece tu nuevo PIN maestro.</div>
+        <input id="new-master-pin" type="tel" inputmode="numeric" maxlength="6" placeholder="Nuevo PIN"
+          style="width:140px; text-align:center; font-size:24px; letter-spacing:8px; padding:10px; border-radius:8px; border:1px solid #ccc; margin-bottom:12px;">
+        <input id="new-master-pin-confirm" type="tel" inputmode="numeric" maxlength="6" placeholder="Repite el PIN"
+          style="width:140px; text-align:center; font-size:24px; letter-spacing:8px; padding:10px; border-radius:8px; border:1px solid ${state.masterRecoveryError ? '#c23b3b' : '#ccc'}; margin-bottom:12px; display:block; margin-left:auto; margin-right:auto;">
+        ${state.masterRecoveryError ? `<div style="color:#c23b3b; font-size:12px; margin-bottom:10px;">Los PIN no coinciden o están vacíos</div>` : ''}
+        <button class="btn btn-primary" style="width:220px; display:block; margin:0 auto;" onclick="guardarNuevoMasterPin()">Guardar nuevo PIN</button>
+        <button class="btn btn-ghost" style="width:auto; margin-top:14px; padding:6px 12px; font-size:12.5px;" onclick="cancelarRecuperacionMasterPin()">Cancelar</button>
+      </div>
+    `;
+    setTimeout(() => { const el = document.getElementById('new-master-pin'); if(el) el.focus(); }, 50);
+    return;
+  }
+}
+async function verificarPasswordRecuperacion(){
+  const pass = document.getElementById('recovery-password').value;
+  if(!pass){ state.masterRecoveryError = true; render(); return; }
+  if(typeof window.firebaseVerifyPassword !== 'function'){ showToast('No se pudo verificar, inténtalo de nuevo'); return; }
+  const ok = await window.firebaseVerifyPassword(pass);
+  if(ok){
+    state.masterRecoveryStep = 'newpin';
+    state.masterRecoveryError = false;
+    render();
+  } else {
+    state.masterRecoveryError = true;
+    render();
+  }
+}
+async function guardarNuevoMasterPin(){
+  const p1 = document.getElementById('new-master-pin').value.replace(/[^0-9]/g,'').slice(0,6);
+  const p2 = document.getElementById('new-master-pin-confirm').value.replace(/[^0-9]/g,'').slice(0,6);
+  if(!p1 || p1 !== p2){ state.masterRecoveryError = true; render(); return; }
+  state.masterPin = p1;
+  state.masterPinUnlocked = true;
+  state.masterRecoveryStep = null;
+  state.masterRecoveryError = false;
+  await saveConfig();
+  state.tab = state.pinTarget || 'ajustes';
+  showToast('PIN maestro restablecido');
+  render();
 }
 function onPinInput(v){
   state.pinInput = v.replace(/[^0-9]/g,'').slice(0,6);
@@ -2461,7 +2543,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -2512,6 +2596,17 @@ window.firebaseLogin = async function(){
 
 window.firebaseLogout = function(){
   signOut(auth);
+};
+window.firebaseVerifyPassword = async function(password){
+  const user = auth.currentUser;
+  if(!user || !user.email) return false;
+  try{
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+    return true;
+  }catch(e){
+    return false;
+  }
 };
 
 /* ---------- exigir conexión a internet al menos 1 vez cada 7 días ---------- */

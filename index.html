@@ -270,6 +270,7 @@ let state = {
   driver: 'Chofer 1',
   drivers: ['Chofer 1','Chofer 2'],
   pctEmpresa: 65,
+  pctEmpresaPorChofer: {},
   loaded: false,
   editingCierreId: null,
   editingServicioId: null,
@@ -301,6 +302,11 @@ let state = {
 const PROTECTED_TABS = ['cierre'];
 const MASTER_TABS = ['ajustes','mensual','anual'];
 function driverIndex(name){ return state.drivers.indexOf(name); }
+function pctPorDefectoPara(chofer){
+  const i = driverIndex(chofer);
+  if(state.pctEmpresaPorChofer && state.pctEmpresaPorChofer[i] != null) return state.pctEmpresaPorChofer[i];
+  return state.pctEmpresa;
+}
 function tienePin(driver){ const i = driverIndex(driver); return i > -1 && !!(state.pins && state.pins[i]); }
 function estaDesbloqueado(driver){ return !!(state.pinUnlocked && state.pinUnlocked[driver]); }
 function tabRequierePin(tab){ return PROTECTED_TABS.includes(tab); }
@@ -361,6 +367,7 @@ async function loadData(){
       if(Array.isArray(parsed.drivers) && parsed.drivers.length === 2) state.drivers = parsed.drivers;
       if(parsed.driver) state.driver = parsed.driver;
       if(parsed.pctEmpresa) state.pctEmpresa = parsed.pctEmpresa;
+      if(parsed.pctEmpresaPorChofer && typeof parsed.pctEmpresaPorChofer === 'object') state.pctEmpresaPorChofer = parsed.pctEmpresaPorChofer;
       if(Array.isArray(parsed.tiposMantenimiento) && parsed.tiposMantenimiento.length) state.tiposMantenimiento = parsed.tiposMantenimiento;
       if(parsed.lastTaxi) state.lastTaxi = parsed.lastTaxi;
       if(parsed.pins && typeof parsed.pins === 'object') state.pins = parsed.pins;
@@ -399,7 +406,7 @@ async function saveMantenimientos(){
   catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
 }
 async function saveConfig(){
-  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, tiposMantenimiento: state.tiposMantenimiento, lastTaxi: state.lastTaxi, pins: state.pins, masterPin: state.masterPin, editRequiereMaster: state.editRequiereMaster })); }
+  try{ lsSet('config-data', JSON.stringify({ drivers: state.drivers, driver: state.driver, pctEmpresa: state.pctEmpresa, pctEmpresaPorChofer: state.pctEmpresaPorChofer, tiposMantenimiento: state.tiposMantenimiento, lastTaxi: state.lastTaxi, pins: state.pins, masterPin: state.masterPin, editRequiereMaster: state.editRequiereMaster })); }
   catch(e){ showToast('No se pudo guardar (memoria del navegador llena o bloqueada).'); }
 }
 
@@ -654,7 +661,7 @@ function setDriver(d){
 
 function renderCierreTab(c){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
-  const d = editing || { fecha: state.workDate || todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: state.pctEmpresa };
+  const d = editing || { fecha: state.workDate || todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: pctPorDefectoPara(state.driver) };
   if(!editing){
     if(!state.cierreDraft){
       state.cierreDraft = { fecha: d.fecha, clientes:'', facturado:'', kmInicio:'', kmFin:'' };
@@ -931,8 +938,11 @@ async function deleteServicioArchivadoConfirm(cierreId, servicioId){
 }
 
 function setPct(p){
-  state.pctEmpresa = p;
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
+  const chofer = editing ? editing.chofer : state.driver;
+  state.pctEmpresa = p;
+  if(!state.pctEmpresaPorChofer) state.pctEmpresaPorChofer = {};
+  state.pctEmpresaPorChofer[driverIndex(chofer)] = p;
   if(editing) editing.pctEmpresa = p;
   saveConfig();
   render();
@@ -2409,6 +2419,7 @@ function exportBackup(){
     exportedAt: new Date().toISOString(),
     drivers: state.drivers,
     pctEmpresa: state.pctEmpresa,
+    pctEmpresaPorChofer: state.pctEmpresaPorChofer,
     tiposMantenimiento: state.tiposMantenimiento,
     pins: state.pins,
     masterPin: state.masterPin,
@@ -2443,6 +2454,7 @@ function importBackup(file){
       state.mantenimientos = Array.isArray(payload.mantenimientos) ? payload.mantenimientos : [];
       if(Array.isArray(payload.drivers) && payload.drivers.length === 2) state.drivers = payload.drivers;
       if(payload.pctEmpresa) state.pctEmpresa = payload.pctEmpresa;
+      if(payload.pctEmpresaPorChofer && typeof payload.pctEmpresaPorChofer === 'object') state.pctEmpresaPorChofer = payload.pctEmpresaPorChofer;
       if(Array.isArray(payload.tiposMantenimiento) && payload.tiposMantenimiento.length) state.tiposMantenimiento = payload.tiposMantenimiento;
       if(payload.pins && typeof payload.pins === 'object') state.pins = payload.pins;
       if(payload.masterPin) state.masterPin = payload.masterPin;

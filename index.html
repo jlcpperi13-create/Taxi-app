@@ -1124,7 +1124,7 @@ function renderGastosTab(c){
     : CAT_PERIODICO;
   const prefillFecha = state.gastoPrefillFecha || state.workDate || todayISO();
   const g = editing || { fecha: prefillFecha, categoria: cats[0].id, importe: '', nota: '' };
-  const list = state.gastos.filter(x => x.tipo === tipo);
+  const list = tipo === 'diario' ? state.gastos.filter(x => x.tipo === tipo && x.chofer === state.driver) : state.gastos.filter(x => x.tipo === tipo);
 
   let bodyHTML;
   if(tipo === 'diario'){
@@ -1325,8 +1325,9 @@ async function deleteGastoConfirm(id){
 
 /* ---------- SERVICIOS TAB ---------- */
 function renderServiciosTab(c){
+  const propios = state.servicios.filter(s => s.chofer === state.driver);
   const grouped = {};
-  [...state.servicios].sort((a,b)=> b.fecha.localeCompare(a.fecha)).forEach(s => {
+  [...propios].sort((a,b)=> b.fecha.localeCompare(a.fecha)).forEach(s => {
     const k = monthKey(s.fecha);
     (grouped[k] = grouped[k] || []).push(s);
   });
@@ -1337,7 +1338,7 @@ function renderServiciosTab(c){
     : { fecha: state.workDate || todayISO(), hora: horaActualHHMM(), taxi: state.lastTaxi || '', cliente:'', origen:'', destino:'', importe:'', pago:'efectivo', estado:'pag', descuentoPct:'' };
 
   c.innerHTML = `
-    <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${state.servicios.length} registrados</span></div>
+    <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${propios.length} registrados</span></div>
     ${driverPillHTML()}
     <div class="card">
       <div class="row2 field">

@@ -695,8 +695,12 @@ function renderCierreTab(c){
 
     <div class="card">
       <div class="subhead">Reparto empresa / chofer</div>
-      <div class="pct-toggle" style="margin-bottom:12px;">
+      <div class="pct-toggle" style="margin-bottom:10px;">
         ${[50,65,70,100].map(p => `<button class="${(+d.pctEmpresa===p)?'active':''}" onclick="setPct(${p})">${p===100?'100%':p+'/'+(100-p)}</button>`).join('')}
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>Otro reparto (% para la empresa)</label>
+        <input type="number" min="0" max="100" step="0.1" id="pct-custom" value="${d.pctEmpresa}" placeholder="Ej. 60" onchange="setPctCustom(this.value)">
       </div>
       <div class="row2">
         <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" id="calc-empresa" style="font-size:14px;">€${fmt(calc.importeEmpresa)}</div></div>
@@ -932,6 +936,12 @@ function setPct(p){
   if(editing) editing.pctEmpresa = p;
   saveConfig();
   render();
+}
+
+function setPctCustom(v){
+  const n = round2(v);
+  if(isNaN(n) || n < 0 || n > 100){ showToast('El reparto debe estar entre 0 y 100'); render(); return; }
+  setPct(n);
 }
 
 function onFechaCierreChange(){

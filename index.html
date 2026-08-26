@@ -653,6 +653,8 @@ function driverPillHTML(){
 }
 function setDriver(d){
   state.driver = d;
+  state.cierreDraft = null;
+  state.skipPrefill = false;
   saveConfig();
   const tabActual = state.tab === 'pinlock' ? (state.pinTarget || 'cierre') : state.tab;
   irATab(tabActual);

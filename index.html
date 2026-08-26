@@ -547,7 +547,7 @@ function cierreCalc(d){
 function todayMeter(chofer, fecha){
   chofer = chofer || state.driver;
   const dateStr = fecha || state.workDate || todayISO();
-  const draft = { fecha: dateStr, chofer, turnoAbierto: true };
+  const draft = { fecha: dateStr, chofer, turnoAbierto: true, pctEmpresa: pctPorDefectoPara(chofer) };
   const facturado = round2(serviciosDeCierre(draft).filter(s => s.estado !== 'anulado').reduce((s,x)=> s + (+x.importe||0), 0));
   const calc = cierreCalc({ ...draft, facturado });
   return { ...calc, gastos: calc.totalGastos };

@@ -466,16 +466,30 @@ function serviciosAbiertos(fecha, chofer){
 function gastosAbiertos(fecha, chofer){
   return state.gastos.filter(g => g.tipo === 'diario' && g.fecha === fecha && g.chofer === chofer);
 }
+/* Igual que las anteriores pero sin filtrar por fecha: todo lo pendiente de ese chofer, sea cual
+   sea la fecha de cada carrera/gasto. Se usa para el turno EN CURSO (aún no guardado), de modo que
+   un turno que cruza la medianoche se contabilice entero junto, sin partirse en dos días. */
+function serviciosAbiertosChofer(chofer){
+  return state.servicios.filter(s => s.chofer === chofer);
+}
+function gastosAbiertosChofer(chofer){
+  return state.gastos.filter(g => g.tipo === 'diario' && g.chofer === chofer);
+}
 
 /* Servicios/gastos que corresponden a UN cierre concreto: sus propios archivados + lo que siga
-   vivo (sin archivar) de esa fecha+chofer, por si se añadió algo nuevo antes de volver a guardar. */
+   vivo (sin archivar) de esa fecha+chofer, por si se añadió algo nuevo antes de volver a guardar.
+   Si "d" es un cierre YA GUARDADO (tiene id), se respeta la fecha exacta para no mezclar con el
+   turno en curso de otro día. Si es un borrador NUEVO (sin id todavía), se toma todo lo pendiente
+   de ese chofer sin filtrar por fecha, para que un turno que cruza la medianoche se vea completo. */
 function serviciosDeCierre(d){
   const propios = Array.isArray(d.serviciosArchivados) ? d.serviciosArchivados : [];
-  return [...propios, ...serviciosAbiertos(d.fecha, d.chofer)];
+  const abiertos = d.turnoAbierto ? serviciosAbiertosChofer(d.chofer) : serviciosAbiertos(d.fecha, d.chofer);
+  return [...propios, ...abiertos];
 }
 function gastosDeCierre(d){
   const propios = Array.isArray(d.gastosArchivados) ? d.gastosArchivados : [];
-  return [...propios, ...gastosAbiertos(d.fecha, d.chofer)];
+  const abiertos = d.turnoAbierto ? gastosAbiertosChofer(d.chofer) : gastosAbiertos(d.fecha, d.chofer);
+  return [...propios, ...abiertos];
 }
 
 /* servicios "vivos" (aún en la lista general) + servicios ya archivados dentro de un cierre de esa fecha/mes
@@ -518,7 +532,7 @@ function cierreCalc(d){
   const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - gastos.autopistaTarjeta + gastos.autopista);
   const kmJornada = Math.max(0, kmFin - kmInicio);
   const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
-  const pct = (+d.pctEmpresa || state.pctEmpresa) / 100;
+  const pct = (d.pctEmpresa !== undefined && d.pctEmpresa !== null && d.pctEmpresa !== '' ? +d.pctEmpresa : state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = round2(choferBase + propinas);
@@ -533,7 +547,7 @@ function cierreCalc(d){
 function todayMeter(chofer, fecha){
   chofer = chofer || state.driver;
   const dateStr = fecha || state.workDate || todayISO();
-  const draft = { fecha: dateStr, chofer };
+  const draft = { fecha: dateStr, chofer, turnoAbierto: true };
   const facturado = round2(serviciosDeCierre(draft).filter(s => s.estado !== 'anulado').reduce((s,x)=> s + (+x.importe||0), 0));
   const calc = cierreCalc({ ...draft, facturado });
   return { ...calc, gastos: calc.totalGastos };
@@ -663,7 +677,7 @@ function setDriver(d){
 
 function renderCierreTab(c){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
-  const d = editing || { fecha: state.workDate || todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: pctPorDefectoPara(state.driver) };
+  const d = editing || { fecha: state.workDate || todayISO(), chofer: state.driver, clientes:'', facturado:'', tpv:'', kmInicio:'', kmFin:'', horas:'', pctEmpresa: pctPorDefectoPara(state.driver), turnoAbierto: true };
   if(!editing){
     if(!state.cierreDraft){
       state.cierreDraft = { fecha: d.fecha, clientes:'', facturado:'', kmInicio:'', kmFin:'' };
@@ -942,7 +956,6 @@ async function deleteServicioArchivadoConfirm(cierreId, servicioId){
 function setPct(p){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
   const chofer = editing ? editing.chofer : state.driver;
-  state.pctEmpresa = p;
   if(!state.pctEmpresaPorChofer) state.pctEmpresaPorChofer = {};
   state.pctEmpresaPorChofer[driverIndex(chofer)] = p;
   if(editing) editing.pctEmpresa = p;
@@ -974,16 +987,18 @@ function onFechaCierreChange(){
 
 function liveCalc(){
   const editing = state.editingCierreId ? state.cierres.find(x=>x.id===state.editingCierreId) : null;
+  const choferForm = document.getElementById('f-chofer').value;
   const d = {
     fecha: document.getElementById('f-fecha').value || todayISO(),
-    chofer: document.getElementById('f-chofer').value,
+    chofer: choferForm,
     clientes: document.getElementById('f-clientes').value,
     facturado: document.getElementById('f-facturado').value,
     kmInicio: document.getElementById('f-kmInicio').value,
     kmFin: document.getElementById('f-kmFin').value,
-    pctEmpresa: state.pctEmpresa,
+    pctEmpresa: editing ? editing.pctEmpresa : pctPorDefectoPara(choferForm),
     serviciosArchivados: editing ? editing.serviciosArchivados : undefined,
     gastosArchivados: editing ? editing.gastosArchivados : undefined,
+    turnoAbierto: !editing,
   };
   if(!editing){
     state.cierreDraft = { fecha: d.fecha, clientes: d.clientes, facturado: d.facturado, kmInicio: d.kmInicio, kmFin: d.kmFin };
@@ -1036,15 +1051,19 @@ async function closeShiftNow(){
 }
 
 async function saveCierre(id, stampNow){
+  const prevCierre = id ? state.cierres.find(x=>x.id===id) : null;
+  const choferForm = document.getElementById('f-chofer').value || state.driver;
+  const esNuevo = !id;
   const d = {
     id: id || uid(),
     fecha: document.getElementById('f-fecha').value || todayISO(),
-    chofer: document.getElementById('f-chofer').value || state.driver,
+    chofer: choferForm,
     clientes: document.getElementById('f-clientes').value,
     facturado: round2(document.getElementById('f-facturado').value),
     kmInicio: document.getElementById('f-kmInicio').value,
     kmFin: document.getElementById('f-kmFin').value,
-    pctEmpresa: state.pctEmpresa,
+    pctEmpresa: prevCierre ? prevCierre.pctEmpresa : pctPorDefectoPara(choferForm),
+    turnoAbierto: esNuevo,
   };
   if(stampNow || !id){
     d.horaCierre = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
@@ -1058,18 +1077,22 @@ async function saveCierre(id, stampNow){
     const seguir = confirm(`Ojo: este cierre sale a €${fmt(calcAviso.eurosPorKm)}/km, por debajo de lo habitual (0,55 €/km).\n\n¿Seguro que quieres guardarlo así?`);
     if(!seguir) return;
   }
+  delete d.turnoAbierto;
 
-  /* Archivar dentro del cierre los servicios y gastos de ESE turno (fecha + chofer) y quitarlos
-     de las listas generales, para que el contador del turno en curso vuelva a cero */
-  const prevCierre = id ? state.cierres.find(x=>x.id===id) : null;
+  /* Archivar dentro del cierre los servicios y gastos del turno. Si es un cierre NUEVO, se recoge
+     TODO lo pendiente de ese chofer (sin importar la fecha de cada carrera), para que un turno que
+     cruza la medianoche quede completo en un único cierre. Si se está EDITANDO uno ya existente,
+     se respeta la fecha exacta, para no mezclar con el turno en curso de otro día distinto. */
   const prevServiciosArchivados = (prevCierre && prevCierre.serviciosArchivados) || [];
   const prevGastosArchivados = (prevCierre && prevCierre.gastosArchivados) || [];
-  const nuevosServicios = state.servicios.filter(s => s.fecha === d.fecha && s.chofer === d.chofer);
-  const nuevosGastos = state.gastos.filter(g => g.tipo === 'diario' && g.fecha === d.fecha && g.chofer === d.chofer);
+  const nuevosServicios = esNuevo ? serviciosAbiertosChofer(d.chofer) : serviciosAbiertos(d.fecha, d.chofer);
+  const nuevosGastos = esNuevo ? gastosAbiertosChofer(d.chofer) : gastosAbiertos(d.fecha, d.chofer);
   d.serviciosArchivados = [...prevServiciosArchivados, ...nuevosServicios];
   d.gastosArchivados = [...prevGastosArchivados, ...nuevosGastos];
-  state.servicios = state.servicios.filter(s => !(s.fecha === d.fecha && s.chofer === d.chofer));
-  state.gastos = state.gastos.filter(g => !(g.tipo === 'diario' && g.fecha === d.fecha && g.chofer === d.chofer));
+  const nuevosServiciosIds = new Set(nuevosServicios.map(s => s.id));
+  const nuevosGastosIds = new Set(nuevosGastos.map(g => g.id));
+  state.servicios = state.servicios.filter(s => !nuevosServiciosIds.has(s.id));
+  state.gastos = state.gastos.filter(g => !nuevosGastosIds.has(g.id));
 
   d.historialEdiciones = Array.isArray(prevCierre && prevCierre.historialEdiciones) ? [...prevCierre.historialEdiciones] : [];
   if(id){

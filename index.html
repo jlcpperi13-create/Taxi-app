@@ -452,13 +452,48 @@ function showToast(msg){
 }
 
 /* ---------- dictado por voz para campos numéricos (importes) ---------- */
+const NUM_UNIDADES = {
+  'cero':0,'un':1,'uno':1,'una':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,
+  'diez':10,'once':11,'doce':12,'trece':13,'catorce':14,'quince':15,
+  'dieciseis':16,'dieciséis':16,'diecisiete':17,'dieciocho':18,'diecinueve':19,'veinte':20,
+  'veintiuno':21,'veintiun':21,'veintiún':21,'veintidos':22,'veintidós':22,'veintitres':23,'veintitrés':23,
+  'veinticuatro':24,'veinticinco':25,'veintiseis':26,'veintiséis':26,'veintisiete':27,'veintiocho':28,'veintinueve':29
+};
+const NUM_DECENAS = {'treinta':30,'cuarenta':40,'cincuenta':50,'sesenta':60,'setenta':70,'ochenta':80,'noventa':90};
+const NUM_CENTENAS = {
+  'cien':100,'ciento':100,'doscientos':200,'doscientas':200,'trescientos':300,'trescientas':300,
+  'cuatrocientos':400,'cuatrocientas':400,'quinientos':500,'quinientas':500,'seiscientos':600,'seiscientas':600,
+  'setecientos':700,'setecientas':700,'ochocientos':800,'ochocientas':800,'novecientos':900,'novecientas':900
+};
+function palabrasANumero(fragmento){
+  const palabras = fragmento.toLowerCase().replace(/[.,]/g,' ').split(/\s+/).filter(p => p && p !== 'y');
+  if(!palabras.length) return null;
+  let total = 0, miles = 0, tieneAlgo = false;
+  for(const p of palabras){
+    if(p === 'mil'){ miles += (total || 1) * 1000; total = 0; tieneAlgo = true; continue; }
+    if(NUM_CENTENAS[p] !== undefined){ total += NUM_CENTENAS[p]; tieneAlgo = true; continue; }
+    if(NUM_DECENAS[p] !== undefined){ total += NUM_DECENAS[p]; tieneAlgo = true; continue; }
+    if(NUM_UNIDADES[p] !== undefined){ total += NUM_UNIDADES[p]; tieneAlgo = true; continue; }
+    /* palabra no reconocida (p.ej. "euros"), se ignora */
+  }
+  return tieneAlgo ? (miles + total) : null;
+}
+function extraerParteNumerica(fragmento){
+  const soloDigitos = fragmento.match(/\d+/);
+  if(soloDigitos) return parseInt(soloDigitos[0], 10);
+  return palabrasANumero(fragmento);
+}
 function extraerNumeroDeVoz(texto){
   texto = texto.toLowerCase().trim();
-  const conDecimales = texto.match(/(\d+)\s*(?:con|coma|punto)\s*(\d+)/);
-  if(conDecimales) return parseFloat(`${conDecimales[1]}.${conDecimales[2]}`);
+  const partes = texto.split(/\s+(?:con|coma|punto)\s+/);
+  if(partes.length === 2){
+    const entero = extraerParteNumerica(partes[0]);
+    const decimal = extraerParteNumerica(partes[1]);
+    if(entero !== null && decimal !== null) return parseFloat(`${entero}.${decimal}`);
+  }
   const simple = texto.match(/\d+(?:[.,]\d+)?/);
   if(simple) return parseFloat(simple[0].replace(',', '.'));
-  return null;
+  return palabrasANumero(texto);
 }
 let recognitionActiva = null;
 function dictarNumero(inputId, btnEl){
@@ -542,6 +577,78 @@ function dictarSelect(selectId, mapaPalabras, btnEl){
     select.value = encontrado;
     select.dispatchEvent(new Event('change', { bubbles: true }));
     showToast(`Seleccionado: ${select.options[select.selectedIndex].text}`);
+  };
+  recognition.onerror = (event) => {
+    if(event.error === 'no-speech') showToast('No se detectó voz, inténtalo de nuevo');
+    else if(event.error === 'not-allowed' || event.error === 'service-not-allowed') showToast('Permiso de micrófono denegado');
+    else showToast('No se pudo reconocer, inténtalo de nuevo');
+  };
+  recognition.onend = () => {
+    if(btnEl) btnEl.classList.remove('listening');
+    recognitionActiva = null;
+  };
+  try{
+    recognition.start();
+  }catch(e){
+    if(btnEl) btnEl.classList.remove('listening');
+    recognitionActiva = null;
+    showToast('No se pudo iniciar el micrófono');
+  }
+}
+
+/* Dictado combinado: reconoce en una sola frase el importe y la forma de pago
+   (ej. "20 euros con tarjeta" o "15 con 50 en efectivo") y rellena ambos campos. */
+const PAGO_PALABRAS_MAPA = {efectivo:['efectivo','contado'], tarjeta:['tarjeta','tarjetas'], transf:['transferencia','transferencias']};
+function extraerFormaPago(texto){
+  for(const valor in PAGO_PALABRAS_MAPA){
+    for(const palabra of PAGO_PALABRAS_MAPA[valor]){
+      if(texto.includes(palabra)) return valor;
+    }
+  }
+  return null;
+}
+function quitarPalabrasDePago(texto){
+  return texto.replace(/\b(en|con|por|de)?\s*(efectivo|contado|tarjetas?|transferencias?)\b/gi, ' ').replace(/\s+/g,' ').trim();
+}
+function dictarImporteYPago(importeId, selectId, btnEl){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    showToast('Dictado por voz no disponible en este navegador (usa Chrome en Android)');
+    return;
+  }
+  if(recognitionActiva){
+    recognitionActiva.stop();
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'es-ES';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognitionActiva = recognition;
+  if(btnEl) btnEl.classList.add('listening');
+  recognition.onresult = (event) => {
+    const textoOriginal = event.results[0][0].transcript;
+    const textoLower = textoOriginal.toLowerCase();
+    const pago = extraerFormaPago(textoLower);
+    const textoNumero = quitarPalabrasDePago(textoLower);
+    const numero = extraerNumeroDeVoz(textoNumero);
+    const inputImporte = document.getElementById(importeId);
+    const selectPago = document.getElementById(selectId);
+    const mensajes = [];
+    if(numero !== null && !isNaN(numero) && inputImporte){
+      inputImporte.value = round2(numero);
+      inputImporte.dispatchEvent(new Event('input', { bubbles: true }));
+      inputImporte.dispatchEvent(new Event('change', { bubbles: true }));
+      mensajes.push(`€${round2(numero)}`);
+    }
+    if(pago && selectPago){
+      selectPago.value = pago;
+      selectPago.dispatchEvent(new Event('change', { bubbles: true }));
+      mensajes.push(selectPago.options[selectPago.selectedIndex].text);
+    }
+    if(!mensajes.length){ showToast(`No se entendió importe ni forma de pago ("${textoOriginal}")`); return; }
+    showToast(mensajes.join(' · '));
   };
   recognition.onerror = (event) => {
     if(event.error === 'no-speech') showToast('No se detectó voz, inténtalo de nuevo');
@@ -1491,6 +1598,7 @@ function renderServiciosTab(c){
     <div class="section-title">${editing ? 'Editar servicio' : 'Nuevo servicio'}<span class="sub">${propios.length} registrados</span></div>
     ${driverPillHTML()}
     <div class="card">
+      <button type="button" class="btn btn-ghost" style="margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="dictarImporteYPago('s-importe','s-pago', this)">🎤 Dictar importe y forma de pago</button>
       <div class="row2 field">
         <div><label>Fecha</label><input type="date" id="s-fecha" value="${s.fecha}"></div>
         <div><label>Hora</label><input type="time" id="s-hora" value="${s.hora || ''}"></div>

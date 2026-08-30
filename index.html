@@ -90,7 +90,7 @@ input,select{font-family:inherit;}
 .field-voz{display:flex; gap:6px; align-items:stretch;}
 .field-voz input, .field-voz select{flex:1; min-width:0;}
 .mic-btn{flex-shrink:0; width:40px; background:var(--surface-2); border:1px solid var(--hair); border-radius:8px; color:var(--muted); font-size:17px; display:flex; align-items:center; justify-content:center; padding:0;}
-.mic-btn.listening{background:var(--coral); border-color:var(--coral); color:#fff; animation:mic-pulse 1s ease-in-out infinite;}
+.mic-btn.listening, .btn.listening{background:var(--coral) !important; border-color:var(--coral) !important; color:#fff !important; animation:mic-pulse 1s ease-in-out infinite;}
 @keyframes mic-pulse{0%,100%{opacity:1;}50%{opacity:0.55;}}
 
 .btn{border:none; border-radius:9px; padding:12px 16px; font-size:14px; font-weight:600; width:100%;}
@@ -512,6 +512,7 @@ function dictarNumero(inputId, btnEl){
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
   recognitionActiva = recognition;
+  showToast('🎤 Escuchando…');
   if(btnEl) btnEl.classList.add('listening');
   recognition.onresult = (event) => {
     const texto = event.results[0][0].transcript;
@@ -562,6 +563,7 @@ function dictarSelect(selectId, mapaPalabras, btnEl){
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
   recognitionActiva = recognition;
+  showToast('🎤 Escuchando…');
   if(btnEl) btnEl.classList.add('listening');
   recognition.onresult = (event) => {
     const texto = event.results[0][0].transcript.toLowerCase();
@@ -626,6 +628,7 @@ function dictarImporteYPago(importeId, selectId, btnEl){
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
   recognitionActiva = recognition;
+  showToast('🎤 Escuchando…');
   if(btnEl) btnEl.classList.add('listening');
   recognition.onresult = (event) => {
     const textoOriginal = event.results[0][0].transcript;

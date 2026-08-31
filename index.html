@@ -801,6 +801,10 @@ function cierreCalc(d){
   const conTarjeta = s => s.pago === 'tarjeta' || s.pago === 'tpv' || s.pago === 'transf';
   const cardServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.importe||0), 0));
   const propinas = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.propina||0), 0));
+  /* Propinas cobradas en efectivo: ya están físicamente en la mano del chofer, así que van
+     100% para él sumadas al "Chofer", pero NUNCA se restan de Efectivo/Efectivo de empresa
+     (a diferencia de las de tarjeta, que sí se restan porque ese dinero nunca llegó a su mano). */
+  const propinasEfectivo = round2(serviciosDia.filter(s => s.pago === 'efectivo').reduce((s,x)=> s + (+x.propina||0), 0));
   const gastos = summarizeGastos(gastosDeCierre(d));
   const autopistaEnServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.autopistaIncluida||0), 0));
   gastos.autopistaTarjeta = round2(gastos.autopistaTarjeta + autopistaEnServicios);
@@ -812,10 +816,11 @@ function cierreCalc(d){
   const pct = (d.pctEmpresa !== undefined && d.pctEmpresa !== null && d.pctEmpresa !== '' ? +d.pctEmpresa : state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
-  const importeChofer = round2(choferBase + propinas);
+  const importeChofer = round2(choferBase + propinas + propinasEfectivo);
   const efectivoEmpresa = round2(efectivo - choferBase);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
-  return { facturado, cardServicios, tarjetaBoxTotal, propinas, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
+  const propinasTotal = round2(propinas + propinasEfectivo);
+  return { facturado, cardServicios, tarjetaBoxTotal, propinas, propinasEfectivo, propinasTotal, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
 }
 
 /* Contador del turno EN CURSO (aún no cerrado) del chofer activo. Al pulsar "Cerrar turno" todo lo
@@ -1011,7 +1016,7 @@ function renderCierreTab(c){
         <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" id="calc-empresa" style="font-size:14px;">€${fmt(calc.importeEmpresa)}</div></div>
         <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" id="calc-chofer">€${fmt(calc.importeChofer)}</div></div>
       </div>
-      ${calc.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" id="calc-propinas" style="font-size:14px;">€${fmt(calc.propinas)}</div></div>` : ''}
+      ${calc.propinasTotal ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" id="calc-propinas" style="font-size:14px;">€${fmt(calc.propinasTotal)}</div></div>` : ''}
     </div>
 
     <div class="card">
@@ -1214,7 +1219,7 @@ async function saveServicioArchivado(cierreId, servicioId){
     importe: importeFinal,
     pago,
     autopistaIncluida,
-    propina: pago !== 'efectivo' && propinaVal ? round2(propinaVal) : '',
+    propina: propinaVal ? round2(propinaVal) : '',
     estado: document.getElementById('sa-estado').value,
     taxi: document.getElementById('sa-taxi').value.trim(),
   };
@@ -1304,7 +1309,7 @@ function liveCalc(){
   document.getElementById('calc-empresa').textContent = `€${fmt(calc.importeEmpresa)}`;
   document.getElementById('calc-chofer').textContent = `€${fmt(calc.importeChofer)}`;
   const propinasEl = document.getElementById('calc-propinas');
-  if(propinasEl) propinasEl.textContent = `€${fmt(calc.propinas)}`;
+  if(propinasEl) propinasEl.textContent = `€${fmt(calc.propinasTotal)}`;
   const btn = document.getElementById('btn-goto-gastos');
   if(btn) btn.setAttribute('onclick', `gotoGastosFor('${d.fecha}')`);
 }
@@ -1795,7 +1800,7 @@ async function saveServicio(id){
     importe: importeFinal,
     pago,
     autopistaIncluida,
-    propina: pago !== 'efectivo' && propinaVal ? round2(propinaVal) : '',
+    propina: propinaVal ? round2(propinaVal) : '',
     estado: document.getElementById('s-estado').value,
     taxi: document.getElementById('s-taxi').value.trim(),
     chofer: state.driver,
@@ -2042,7 +2047,7 @@ function renderMensualTab(c){
     acc.autopistaTarjeta += calc.gastosDetalle.autopistaTarjeta;
     acc.empresa += calc.importeEmpresa;
     acc.chofer += calc.importeChofer;
-    acc.propinas += calc.propinas;
+    acc.propinas += calc.propinasTotal;
     acc.km += calc.kmJornada;
     fechasUnicas.add(d.fecha);
     return acc;
@@ -2157,7 +2162,7 @@ function renderAnualTab(c){
     m.autopistaTarjeta += calc.gastosDetalle.autopistaTarjeta;
     m.empresa += calc.importeEmpresa;
     m.chofer += calc.importeChofer;
-    m.propinas += calc.propinas;
+    m.propinas += calc.propinasTotal;
     m.km += calc.kmJornada;
     (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
@@ -2417,7 +2422,7 @@ function totalesMes(mes){
     acc.autopistaTarjeta += calc.gastosDetalle.autopistaTarjeta;
     acc.empresa += calc.importeEmpresa;
     acc.chofer += calc.importeChofer;
-    acc.propinas += calc.propinas;
+    acc.propinas += calc.propinasTotal;
     acc.km += calc.kmJornada;
     fechasUnicas.add(d.fecha);
     return acc;
@@ -2481,7 +2486,7 @@ function totalesAnio(year){
     m.autopistaTarjeta += calc.gastosDetalle.autopistaTarjeta;
     m.empresa += calc.importeEmpresa;
     m.chofer += calc.importeChofer;
-    m.propinas += calc.propinas;
+    m.propinas += calc.propinasTotal;
     m.km += calc.kmJornada;
     (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });

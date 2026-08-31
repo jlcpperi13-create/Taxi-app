@@ -2934,18 +2934,22 @@ window.firebaseLogin = async function(){
   btn.textContent = 'Entrando…';
   btn.disabled = true;
   try{
-    await signInWithEmailAndPassword(auth, email, password);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject({ code: 'timeout' }), 15000));
+    await Promise.race([signInWithEmailAndPassword(auth, email, password), timeoutPromise]);
     // onAuthStateChanged se encarga de mostrar la app
   }catch(e){
-    err.textContent = mensajeError(e.code);
+    err.textContent = e.code === 'timeout' ? 'Tardando demasiado, revisa tu conexión e inténtalo de nuevo' : mensajeError(e.code);
   }finally{
     btn.textContent = 'Entrar';
     btn.disabled = false;
   }
 };
 
-window.firebaseLogout = function(){
-  signOut(auth);
+window.firebaseLogout = async function(){
+  try{
+    await signOut(auth);
+  }catch(e){ /* seguimos igualmente con la recarga */ }
+  location.reload();
 };
 window.firebaseVerifyPassword = async function(password){
   const user = auth.currentUser;

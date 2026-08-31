@@ -2739,6 +2739,18 @@ function renderAjustesTab(c){
     </div>
 
     <div class="card">
+      <div class="subhead">Mis credenciales de acceso</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Cambia tu correo o contraseña de acceso a esta app. Solo tú conoces la nueva contraseña una vez la cambies.</div>
+      <div class="field"><label>Contraseña actual</label><input type="password" id="cred-actual" autocomplete="current-password" placeholder="Necesaria para confirmar cualquier cambio"></div>
+      <div class="field"><label>Nueva contraseña (opcional)</label><input type="password" id="cred-nueva-pass" autocomplete="new-password" placeholder="Déjalo vacío si no la cambias"></div>
+      <div class="field"><label>Repite la nueva contraseña</label><input type="password" id="cred-nueva-pass-confirm" autocomplete="new-password" placeholder="Repite la contraseña nueva"></div>
+      <button class="btn btn-ghost" style="margin-bottom:14px;" onclick="cambiarPasswordUsuario()">Cambiar contraseña</button>
+      <div class="field"><label>Nuevo correo (opcional)</label><input type="email" id="cred-nuevo-email" autocomplete="email" placeholder="Déjalo vacío si no lo cambias"></div>
+      <button class="btn btn-ghost" onclick="cambiarEmailUsuario()">Cambiar correo</button>
+      <div id="cred-msg" style="font-size:12.5px; margin-top:10px; min-height:16px;"></div>
+    </div>
+
+    <div class="card">
       <div class="subhead">Sesión</div>
       <div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Cierra tu sesión en este dispositivo. Tendrás que volver a iniciar sesión con tu correo y contraseña.</div>
       <button class="btn btn-ghost" onclick="firebaseLogout()">Cerrar sesión</button>
@@ -2847,6 +2859,55 @@ function wipeAllData(){
   render();
 }
 
+function mostrarMensajeCred(msg, esError){
+  const el = document.getElementById('cred-msg');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = esError ? '#c23b3b' : 'var(--teal)';
+}
+
+async function cambiarPasswordUsuario(){
+  const actual = document.getElementById('cred-actual').value;
+  const nueva = document.getElementById('cred-nueva-pass').value;
+  const confirmacion = document.getElementById('cred-nueva-pass-confirm').value;
+  mostrarMensajeCred('', false);
+  if(!actual){ mostrarMensajeCred('Introduce tu contraseña actual', true); return; }
+  if(!nueva){ mostrarMensajeCred('Escribe la nueva contraseña', true); return; }
+  if(nueva.length < 6){ mostrarMensajeCred('La nueva contraseña debe tener al menos 6 caracteres', true); return; }
+  if(nueva !== confirmacion){ mostrarMensajeCred('Las dos contraseñas nuevas no coinciden', true); return; }
+  if(typeof window.firebaseChangePassword !== 'function'){ mostrarMensajeCred('No disponible en este momento', true); return; }
+  mostrarMensajeCred('Cambiando contraseña…', false);
+  const resultado = await window.firebaseChangePassword(actual, nueva);
+  if(resultado.ok){
+    document.getElementById('cred-actual').value = '';
+    document.getElementById('cred-nueva-pass').value = '';
+    document.getElementById('cred-nueva-pass-confirm').value = '';
+    mostrarMensajeCred('Contraseña actualizada correctamente', false);
+    showToast('Contraseña actualizada');
+  } else {
+    mostrarMensajeCred(resultado.mensaje, true);
+  }
+}
+
+async function cambiarEmailUsuario(){
+  const actual = document.getElementById('cred-actual').value;
+  const nuevoEmail = document.getElementById('cred-nuevo-email').value.trim();
+  mostrarMensajeCred('', false);
+  if(!actual){ mostrarMensajeCred('Introduce tu contraseña actual', true); return; }
+  if(!nuevoEmail){ mostrarMensajeCred('Escribe el nuevo correo', true); return; }
+  if(typeof window.firebaseChangeEmail !== 'function'){ mostrarMensajeCred('No disponible en este momento', true); return; }
+  mostrarMensajeCred('Cambiando correo…', false);
+  const resultado = await window.firebaseChangeEmail(actual, nuevoEmail);
+  if(resultado.ok){
+    document.getElementById('cred-actual').value = '';
+    document.getElementById('cred-nuevo-email').value = '';
+    mostrarMensajeCred('Correo actualizado correctamente', false);
+    showToast('Correo actualizado');
+  } else {
+    mostrarMensajeCred(resultado.mensaje, true);
+  }
+}
+
 /* ---------- BLOQUEO POR INACTIVIDAD ---------- */
 const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutos
 state.lastActivity = Date.now();
@@ -2900,7 +2961,9 @@ import {
   setPersistence,
   browserLocalPersistence,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  updatePassword,
+  updateEmail
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -2916,17 +2979,20 @@ const firebaseAppInstance = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseAppInstance);
 setPersistence(auth, browserLocalPersistence);
 
-function mensajeError(codigo){
+function mensajeError(codigo, generico){
   const mapa = {
     'auth/invalid-email': 'Correo no válido',
     'auth/user-disabled': 'Esta cuenta está deshabilitada',
     'auth/user-not-found': 'No existe una cuenta con ese correo',
     'auth/wrong-password': 'Contraseña incorrecta',
-    'auth/invalid-credential': 'Correo o contraseña incorrectos',
+    'auth/invalid-credential': 'Contraseña actual incorrecta',
     'auth/missing-password': 'Escribe la contraseña',
     'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos.',
+    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
+    'auth/email-already-in-use': 'Ese correo ya está en uso por otra cuenta',
+    'auth/requires-recent-login': 'Por seguridad, vuelve a introducir tu contraseña actual e inténtalo de nuevo',
   };
-  return mapa[codigo] || 'No se pudo iniciar sesión, revisa tus datos';
+  return mapa[codigo] || generico || 'No se pudo iniciar sesión, revisa tus datos';
 }
 
 window.firebaseLogin = async function(){
@@ -2965,6 +3031,38 @@ window.firebaseVerifyPassword = async function(password){
     return true;
   }catch(e){
     return false;
+  }
+};
+window.firebaseChangePassword = async function(currentPassword, newPassword){
+  const user = auth.currentUser;
+  if(!user || !user.email) return { ok:false, mensaje:'No hay sesión activa' };
+  try{
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  }catch(e){
+    return { ok:false, mensaje: mensajeError(e.code, 'No se pudo verificar tu contraseña actual') };
+  }
+  try{
+    await updatePassword(user, newPassword);
+    return { ok:true };
+  }catch(e){
+    return { ok:false, mensaje: mensajeError(e.code, 'No se pudo cambiar la contraseña') };
+  }
+};
+window.firebaseChangeEmail = async function(currentPassword, newEmail){
+  const user = auth.currentUser;
+  if(!user || !user.email) return { ok:false, mensaje:'No hay sesión activa' };
+  try{
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  }catch(e){
+    return { ok:false, mensaje: mensajeError(e.code, 'No se pudo verificar tu contraseña actual') };
+  }
+  try{
+    await updateEmail(user, newEmail);
+    return { ok:true };
+  }catch(e){
+    return { ok:false, mensaje: mensajeError(e.code, 'No se pudo cambiar el correo') };
   }
 };
 

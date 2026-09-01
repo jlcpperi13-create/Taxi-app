@@ -284,6 +284,8 @@ let state = {
   editingGastoArchivadoId: null,
   masterRecoveryStep: null,
   masterRecoveryError: false,
+  historialDesde: '',
+  historialHasta: '',
   editingMantenimientoId: null,
   gastoTipo: 'diario',
   gastoPrefillFecha: null,
@@ -1083,9 +1085,51 @@ function renderCierreTab(c){
     ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingCierreId=null; state.editingServicioArchivadoId=null; state.editingGastoArchivadoId=null; render();">Cancelar</button>` : ''}
 
     <div class="section-title" style="margin-top:24px;">Historial</div>
+    <div class="card">
+      <div class="subhead">Filtrar por rango de fechas</div>
+      <div class="row2 field">
+        <div><label>Desde</label><input type="date" id="hist-desde" value="${state.historialDesde}"></div>
+        <div><label>Hasta</label><input type="date" id="hist-hasta" value="${state.historialHasta}"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="aplicarFiltroHistorial()">Ver totales del rango</button>
+        ${state.historialDesde && state.historialHasta ? `<button class="btn btn-ghost" onclick="quitarFiltroHistorial()">Quitar filtro</button>` : ''}
+      </div>
+      ${state.historialDesde && state.historialHasta ? (() => {
+        const { totals, cierres: cierresRango, servicios: serviciosRangoCount } = totalesRango(state.historialDesde, state.historialHasta, state.driver);
+        const desdeTxt = new Date(state.historialDesde+'T00:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+        const hastaTxt = new Date(state.historialHasta+'T00:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+        return cierresRango.length === 0 ? `<div class="notice" style="margin-top:12px;">Sin cierres de ${state.driver} entre ${desdeTxt} y ${hastaTxt}.</div>` : `
+        <div class="notice" style="margin-top:12px; margin-bottom:2px;">Del ${desdeTxt} al ${hastaTxt} · ${state.driver}</div>
+        <div class="row2" style="margin-top:10px;">
+          <div class="meter-cell teal"><div class="label">Facturado</div><div class="value mono" style="font-size:16px;">€${fmt(totals.facturado)}</div></div>
+          <div class="meter-cell"><div class="label">Efectivo</div><div class="value mono" style="font-size:16px;">€${fmt(totals.efectivo)}</div></div>
+        </div>
+        <div class="meter-cell teal" style="margin-top:10px;">
+          <div class="label">Efectivo de empresa</div>
+          <div class="value mono" style="font-size:16px;">€${fmt(totals.efectivoEmpresa)}</div>
+        </div>
+        <div class="row2" style="margin-top:10px;">
+          <div class="meter-cell"><div class="label">Empresa</div><div class="value mono" style="font-size:14px;">€${fmt(totals.empresa)}</div></div>
+          <div class="meter-cell"><div class="label">Chofer</div><div class="value mono" style="font-size:14px;">€${fmt(totals.chofer)}</div></div>
+        </div>
+        ${totals.propinas ? `<div class="meter-cell teal" style="margin-top:10px;"><div class="label">Incluye propinas/redondeo (100% chofer)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.propinas)}</div></div>` : ''}
+        <div class="row2" style="margin-top:10px;">
+          <div class="meter-cell"><div class="label">Gastos</div><div class="value mono" style="font-size:14px;">€${fmt(totals.gastosVar)}</div></div>
+          <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${serviciosRangoCount}</div></div>
+        </div>
+        <div class="row2" style="margin-top:10px;">
+          <div class="meter-cell"><div class="label">Días trabajados</div><div class="value mono" style="font-size:14px;">${totals.dias}</div></div>
+          <div class="meter-cell"><div class="label">Km recorridos</div><div class="value mono" style="font-size:14px;">${fmt(totals.km)}</div></div>
+        </div>
+        `;
+      })() : ''}
+    </div>
     <div class="card" style="padding:4px 16px;">
-      ${(() => { const propios = state.cierres.filter(x => x.chofer === state.driver);
-        return propios.length === 0 ? emptyHTML('Sin cierres todavía', 'Registra el primer día arriba.') :
+      ${(() => { const propios = (state.historialDesde && state.historialHasta)
+          ? state.cierres.filter(x => x.chofer === state.driver && x.fecha >= state.historialDesde && x.fecha <= state.historialHasta)
+          : state.cierres.filter(x => x.chofer === state.driver);
+        return propios.length === 0 ? emptyHTML(state.historialDesde && state.historialHasta ? 'Sin cierres en ese rango' : 'Sin cierres todavía', 'Registra el primer día arriba.') :
         [...propios].sort((a,b)=> b.fecha.localeCompare(a.fecha)).map(cierreRowHTML).join(''); })()}
     </div>
   `;
@@ -2400,6 +2444,49 @@ function seccionesDesdeTotales(totals, extra){
       ['Km recorridos', `${fmt(totals.km)}`],
     ]},
   ];
+}
+
+function totalesRango(desde, hasta, chofer){
+  const cierresRango = state.cierres.filter(d => d.chofer === chofer && d.fecha >= desde && d.fecha <= hasta).sort((a,b)=> a.fecha.localeCompare(b.fecha));
+  const serviciosRango = cierresRango.flatMap(d => Array.isArray(d.serviciosArchivados) ? d.serviciosArchivados : []).filter(s => s.estado !== 'anulado');
+  const fechasUnicas = new Set();
+  const totals = cierresRango.reduce((acc, d) => {
+    const calc = cierreCalc(d);
+    acc.facturado += calc.facturado;
+    acc.efectivo += calc.efectivo;
+    acc.efectivoEmpresa += calc.efectivoEmpresa;
+    acc.cardServicios += calc.tarjetaBoxTotal;
+    acc.gastosVar += calc.totalGastos;
+    acc.autopista += calc.autopista;
+    acc.gasolina += calc.gastosDetalle.gasolina;
+    acc.gastosTarjeta += calc.gastosDetalle.tarjeta;
+    acc.otrosGastos += calc.gastosDetalle.otros;
+    acc.autopistaEfectivo += calc.gastosDetalle.autopistaEfectivo;
+    acc.autopistaTarjeta += calc.gastosDetalle.autopistaTarjeta;
+    acc.empresa += calc.importeEmpresa;
+    acc.chofer += calc.importeChofer;
+    acc.propinas += calc.propinasTotal;
+    acc.km += calc.kmJornada;
+    fechasUnicas.add(d.fecha);
+    return acc;
+  }, { facturado:0, efectivo:0, efectivoEmpresa:0, cardServicios:0, gastosVar:0, autopista:0, gasolina:0, gastosTarjeta:0, otrosGastos:0, autopistaEfectivo:0, autopistaTarjeta:0, empresa:0, chofer:0, propinas:0, km:0, dias:0 });
+  totals.dias = fechasUnicas.size;
+  return { totals, cierres: cierresRango, servicios: serviciosRango.length };
+}
+
+function aplicarFiltroHistorial(){
+  const desde = document.getElementById('hist-desde').value;
+  const hasta = document.getElementById('hist-hasta').value;
+  if(!desde || !hasta){ showToast('Elige las dos fechas'); return; }
+  if(desde > hasta){ showToast('"Desde" no puede ser posterior a "Hasta"'); return; }
+  state.historialDesde = desde;
+  state.historialHasta = hasta;
+  render();
+}
+function quitarFiltroHistorial(){
+  state.historialDesde = '';
+  state.historialHasta = '';
+  render();
 }
 
 function totalesMes(mes){

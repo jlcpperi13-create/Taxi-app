@@ -818,7 +818,7 @@ function cierreCalc(d){
   const pct = (d.pctEmpresa !== undefined && d.pctEmpresa !== null && d.pctEmpresa !== '' ? +d.pctEmpresa : state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
-  const importeChofer = round2(choferBase + propinas + propinasEfectivo);
+  const importeChofer = choferBase;
   const efectivoEmpresa = round2(efectivo - choferBase);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
   const propinasTotal = round2(propinas + propinasEfectivo);

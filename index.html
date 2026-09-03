@@ -808,18 +808,26 @@ function cierreCalc(d){
      (a diferencia de las de tarjeta, que sí se restan porque ese dinero nunca llegó a su mano). */
   const propinasEfectivo = round2(serviciosDia.filter(s => s.pago === 'efectivo').reduce((s,x)=> s + (+x.propina||0), 0));
   const gastos = summarizeGastos(gastosDeCierre(d));
+  /* Autopista incluida en el cobro de una carrera: distinta lógica según la forma de pago.
+     - TARJETA: ese dinero nunca formó parte de "Facturado"/"cardServicios" (el importe de la
+       carrera no lo incluye), así que no debe tocar ni Efectivo ni Efectivo de empresa.
+     - EFECTIVO: sí es dinero real que el chofer ha cobrado en mano, así que se suma a Efectivo
+       (y de ahí se traslada de forma natural a Efectivo de empresa, sin sumarlo dos veces). */
+  const autopistaGastoTarjeta = gastos.autopistaTarjeta;
   const autopistaEnServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.autopistaIncluida||0), 0));
-  gastos.autopistaTarjeta = round2(gastos.autopistaTarjeta + autopistaEnServicios);
+  const autopistaEnServiciosEfectivo = round2(serviciosDia.filter(s => s.pago === 'efectivo').reduce((s,x)=> s + (+x.autopistaIncluida||0), 0));
+  gastos.autopistaTarjeta = round2(autopistaGastoTarjeta + autopistaEnServicios); // total para mostrar en el desglose
+  gastos.autopistaEfectivo = round2(gastos.autopistaEfectivo + autopistaEnServiciosEfectivo); // idem, desglose
   gastos.autopista = round2(gastos.autopistaEfectivo + gastos.autopistaTarjeta);
   const gastosEfectivo = round2(gastos.gasolina + gastos.otros);
-  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - gastos.autopistaTarjeta);
+  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - autopistaGastoTarjeta + gastos.autopistaEfectivo);
   const kmJornada = Math.max(0, kmFin - kmInicio);
   const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
   const pct = (d.pctEmpresa !== undefined && d.pctEmpresa !== null && d.pctEmpresa !== '' ? +d.pctEmpresa : state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = choferBase;
-  const efectivoEmpresa = round2(efectivo - choferBase + gastos.autopistaTarjeta + gastos.autopistaEfectivo);
+  const efectivoEmpresa = round2(efectivo - choferBase + autopistaGastoTarjeta);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
   const propinasTotal = round2(propinas + propinasEfectivo);
   return { facturado, cardServicios, tarjetaBoxTotal, propinas, propinasEfectivo, propinasTotal, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };
@@ -1249,7 +1257,7 @@ async function saveServicioArchivado(cierreId, servicioId){
   const precioBase = round2(importeVal);
   const importeFinal = round2(precioBase * (1 - descuentoPct/100));
   const autopistaEl = document.getElementById('sa-autopista-incluida');
-  const autopistaIncluida = (pago !== 'efectivo' && autopistaEl && autopistaEl.value) ? round2(autopistaEl.value) : '';
+  const autopistaIncluida = (autopistaEl && autopistaEl.value) ? round2(autopistaEl.value) : '';
   const prev = cierre.serviciosArchivados[idx];
   cierre.serviciosArchivados[idx] = {
     ...prev,
@@ -1744,10 +1752,10 @@ function renderServiciosTab(c){
           <button class="btn btn-primary" style="width:100%;" onclick="saveServicio(${editing ? `'${editing.id}'` : 'null'})">${editing ? 'Guardar cambios' : 'Añadir servicio'}</button>
         </div>
       </div>
-      <div class="field" id="autopista-incluida-wrap" style="display:${s.pago!=='efectivo' ? 'block':'none'};">
+      <div class="field" id="autopista-incluida-wrap">
         <label>Autopista incluida en este cobro (€)</label>
         <input type="number" step="0.01" id="s-autopista-incluida" value="${s.autopistaIncluida || ''}" placeholder="0.00">
-        <details class="notice-toggle" style="margin-top:6px;"><summary>Info</summary><div class="notice">Si el peaje fue cobrado junto con la carrera por tarjeta/transferencia, ponlo aquí. No se suma al importe del servicio (el reparto empresa/chofer sigue calculándose solo sobre la carrera), pero sí se descuenta del Efectivo y cuenta como Autopista con tarjeta.</div></details>
+        <details class="notice-toggle" style="margin-top:6px;"><summary>Info</summary><div class="notice">No se suma al importe del servicio (el reparto empresa/chofer sigue calculándose solo sobre la carrera). Si se cobró por tarjeta/transferencia, no afecta a Efectivo (ese dinero nunca llegó a tu mano) y cuenta como Autopista con tarjeta. Si se cobró en efectivo, sí se suma a Efectivo (lo cobraste en mano) y cuenta como Autopista en efectivo.</div></details>
       </div>
       ${editing ? `<div class="btn-row"><button class="btn btn-danger" onclick="deleteServicioConfirm('${editing.id}')">Eliminar</button></div>` : ''}
       ${editing ? `<button class="btn btn-ghost" style="margin-top:8px;" onclick="state.editingServicioId=null; render();">Cancelar</button>` : ''}
@@ -1799,9 +1807,8 @@ function servicioRowHTML(s){
 function editServicio(id){ state.editingServicioId = id; render(); window.scrollTo(0,0); }
 
 function toggleAutopistaIncluida(){
-  const pago = document.getElementById('s-pago').value;
-  const wrap = document.getElementById('autopista-incluida-wrap');
-  if(wrap) wrap.style.display = pago !== 'efectivo' ? 'block' : 'none';
+  /* El campo "Autopista incluida" ahora es visible para cualquier forma de pago,
+     esta función se deja como no-op por compatibilidad con la llamada existente. */
 }
 
 function previewDescuento(){
@@ -1831,7 +1838,7 @@ async function saveServicio(id){
   const precioBase = round2(importeVal);
   const importeFinal = round2(precioBase * (1 - descuentoPct/100));
   const autopistaIncluidaEl = document.getElementById('s-autopista-incluida');
-  const autopistaIncluida = (pago !== 'efectivo' && autopistaIncluidaEl && autopistaIncluidaEl.value) ? round2(autopistaIncluidaEl.value) : '';
+  const autopistaIncluida = (autopistaIncluidaEl && autopistaIncluidaEl.value) ? round2(autopistaIncluidaEl.value) : '';
   const s = {
     id: id || uid(),
     fecha,

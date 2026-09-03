@@ -808,26 +808,18 @@ function cierreCalc(d){
      (a diferencia de las de tarjeta, que sí se restan porque ese dinero nunca llegó a su mano). */
   const propinasEfectivo = round2(serviciosDia.filter(s => s.pago === 'efectivo').reduce((s,x)=> s + (+x.propina||0), 0));
   const gastos = summarizeGastos(gastosDeCierre(d));
-  /* Dos fuentes distintas de "autopista con tarjeta", que hay que tratar diferente:
-     1) Gasto suelto anotado en la pestaña Gastos (gastos.autopistaTarjeta) → dinero que la
-        empresa pagó aparte, sí hay que restarlo de Efectivo y compensarlo en Efectivo de empresa.
-     2) Autopista incluida dentro del cobro de una carrera con tarjeta (autopistaIncluida) → ese
-        dinero NUNCA formó parte del "Facturado"/"cardServicios" (el importe de la carrera no lo
-        incluye), así que no hay nada que restar ni compensar: no debe tocar ni Efectivo ni
-        Efectivo de empresa en ningún sentido. */
-  const autopistaGastoTarjeta = gastos.autopistaTarjeta;
   const autopistaEnServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.autopistaIncluida||0), 0));
-  gastos.autopistaTarjeta = round2(autopistaGastoTarjeta + autopistaEnServicios); // total para mostrar en el desglose
+  gastos.autopistaTarjeta = round2(gastos.autopistaTarjeta + autopistaEnServicios);
   gastos.autopista = round2(gastos.autopistaEfectivo + gastos.autopistaTarjeta);
   const gastosEfectivo = round2(gastos.gasolina + gastos.otros);
-  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - autopistaGastoTarjeta);
+  const efectivo = round2(facturado - cardServicios - propinas - gastosEfectivo - gastos.autopistaTarjeta);
   const kmJornada = Math.max(0, kmFin - kmInicio);
   const eurosPorKm = kmJornada > 0 ? round2(facturado / kmJornada) : 0;
   const pct = (d.pctEmpresa !== undefined && d.pctEmpresa !== null && d.pctEmpresa !== '' ? +d.pctEmpresa : state.pctEmpresa) / 100;
   const importeEmpresa = round2(facturado * pct);
   const choferBase = round2(facturado * (1 - pct));
   const importeChofer = choferBase;
-  const efectivoEmpresa = round2(efectivo - choferBase + autopistaGastoTarjeta + gastos.autopistaEfectivo);
+  const efectivoEmpresa = round2(efectivo - choferBase + gastos.autopistaTarjeta + gastos.autopistaEfectivo);
   const tarjetaBoxTotal = round2(cardServicios + gastos.autopistaTarjeta + propinas);
   const propinasTotal = round2(propinas + propinasEfectivo);
   return { facturado, cardServicios, tarjetaBoxTotal, propinas, propinasEfectivo, propinasTotal, efectivo, gastosEfectivo, efectivoEmpresa, kmJornada, eurosPorKm, importeEmpresa, choferBase, importeChofer, totalGastos: round2(gastos.total), autopista: round2(gastos.autopista), gastosDetalle: gastos };

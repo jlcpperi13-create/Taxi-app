@@ -109,6 +109,7 @@ input,select{font-family:inherit;}
 .pct-toggle input.active{background:var(--amber); color:#1A1300; font-weight:600;}
 
 .entry{border-bottom:1px solid var(--hair); padding:12px 0;}
+.entry.pago-no-efectivo{border-left:3px solid var(--teal); padding-left:10px; background:rgba(63,167,150,0.07);}
 .entry:last-child{border-bottom:none;}
 .entry-top{display:flex; justify-content:space-between; align-items:baseline;}
 .entry-date{font-size:15px; font-weight:600;}
@@ -1171,7 +1172,7 @@ function cierreRowHTML(d){
 function archivedServicioRowHTML(s, cierreId){
   const dt = new Date(s.fecha + 'T00:00:00');
   const propina = +s.propina || 0;
-  return `<div class="entry" onclick="editServicioArchivado('${cierreId}','${s.id}')" style="cursor:pointer;">
+  return `<div class="entry ${s.pago!=='efectivo'?'pago-no-efectivo':''}" onclick="editServicioArchivado('${cierreId}','${s.id}')" style="cursor:pointer;">
     <div class="entry-top">
       <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
@@ -1788,7 +1789,7 @@ function renderServiciosTab(c){
 function servicioRowHTML(s){
   const dt = new Date(s.fecha + 'T00:00:00');
   const propina = +s.propina || 0;
-  return `<div class="entry" onclick="editServicio('${s.id}')" style="cursor:pointer;">
+  return `<div class="entry ${s.pago!=='efectivo'?'pago-no-efectivo':''}" onclick="editServicio('${s.id}')" style="cursor:pointer;">
     <div class="entry-top">
       <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>

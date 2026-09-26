@@ -241,6 +241,7 @@ function lsGet(key){
 }
 function lsSet(key, value){
   localStorage.setItem(LS_PREFIX + key, value);
+  if(typeof window.programarCopiaNube === 'function') window.programarCopiaNube();
   return { value };
 }
 
@@ -2798,6 +2799,7 @@ function renderAjustesTab(c){
         <input type="file" accept="application/json" id="import-file" style="display:none;" onchange="importBackup(this.files[0])">
       </label>
     </div>
+    ${renderNubeCard()}
 
     <div class="card">
       <div class="subhead">Choferes</div>
@@ -2861,8 +2863,9 @@ function renderAjustesTab(c){
   `;
 }
 
-function exportBackup(){
-  const payload = {
+/* ---------- copia de seguridad: piezas comunes (manual y nube) ---------- */
+function buildBackupPayload(){
+  return {
     exportedAt: new Date().toISOString(),
     drivers: state.drivers,
     pctEmpresa: state.pctEmpresa,
@@ -2876,6 +2879,63 @@ function exportBackup(){
     gastos: state.gastos,
     mantenimientos: state.mantenimientos,
   };
+}
+async function applyBackupPayload(payload){
+  state.cierres = Array.isArray(payload.cierres) ? payload.cierres : [];
+  state.servicios = Array.isArray(payload.servicios) ? payload.servicios : [];
+  state.gastos = Array.isArray(payload.gastos) ? payload.gastos : [];
+  state.mantenimientos = Array.isArray(payload.mantenimientos) ? payload.mantenimientos : [];
+  if(Array.isArray(payload.drivers) && payload.drivers.length === 2) state.drivers = payload.drivers;
+  if(payload.pctEmpresa) state.pctEmpresa = payload.pctEmpresa;
+  if(payload.pctEmpresaPorChofer && typeof payload.pctEmpresaPorChofer === 'object') state.pctEmpresaPorChofer = payload.pctEmpresaPorChofer;
+  if(Array.isArray(payload.tiposMantenimiento) && payload.tiposMantenimiento.length) state.tiposMantenimiento = payload.tiposMantenimiento;
+  if(payload.pins && typeof payload.pins === 'object') state.pins = payload.pins;
+  if(payload.masterPin) state.masterPin = payload.masterPin;
+  if(typeof payload.editRequiereMaster === 'boolean') state.editRequiereMaster = payload.editRequiereMaster;
+  if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
+  await saveCierres(); await saveServicios(); await saveGastos(); await saveMantenimientos(); await saveConfig();
+  render();
+}
+window.mcBuildBackup = buildBackupPayload;
+window.mcApplyBackup = applyBackupPayload;
+window.mcDatosCargados = () => !!state.loaded;
+window.mcEnAjustes = () => state.tab === 'ajustes';
+window.mcResumen = () => {
+  const r = { cierres: state.cierres.length, servicios: state.servicios.length, gastos: state.gastos.length, mant: state.mantenimientos.length };
+  r.total = r.cierres + r.servicios + r.gastos + r.mant;
+  return r;
+};
+function mcEsc(t){ return String(t==null?'':t).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+function nubeTexto(c){
+  if(!c || !c.resumen) return '';
+  return c.fecha.split('-').reverse().join('/') + (c.hora ? ' a las ' + c.hora : '') + ' · ' + c.resumen.cierres + ' cierres, ' + c.resumen.servicios + ' servicios, ' + c.resumen.gastos + ' gastos';
+}
+function renderNubeCard(){
+  const n = window.mcNubeInfo;
+  if(!n) return '';
+  let estado;
+  if(!n.cargado) estado = '<div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Consultando la nube…</div>';
+  else if(n.reciente) estado = '<div style="font-size:13px; margin-bottom:6px;"><b>Última:</b> ' + mcEsc(nubeTexto(n.reciente)) + '</div>' +
+    (n.anterior ? '<div style="font-size:13px; margin-bottom:10px;"><b>Anterior:</b> ' + mcEsc(nubeTexto(n.anterior)) + '</div>' : '<div style="margin-bottom:10px;"></div>');
+  else estado = '<div style="font-size:13px; color:var(--muted); margin-bottom:10px;">Todavía no hay copias en la nube.</div>';
+  return `
+    <div class="card">
+      <div class="subhead">Copia automática en la nube</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:12px;">Guarda tus datos en tu cuenta de MiContable (servidores de Google Firebase) cada vez que cambian. Se conservan dos copias: la de hoy y la del último día anterior, y cada día la nueva sustituye a la vieja. Solo tú puedes verlas, entrando con tu cuenta. Si cambias de móvil o se borran los datos del navegador, podrás recuperarlo todo desde aquí.</div>
+      <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; font-weight:600;">
+        <input type="checkbox" ${n.activa ? 'checked' : ''} onchange="nubeActivar(this.checked)" style="width:22px; height:22px;"> Copia automática activada
+      </label>
+      ${n.aviso ? '<div class="notice" style="margin-bottom:12px;">' + mcEsc(n.aviso) + '</div>' : ''}
+      ${estado}
+      ${n.activa ? `<button class="btn btn-ghost" style="margin-bottom:10px;" onclick="nubeCopiarAhora()" ${n.ocupado ? 'disabled' : ''}>☁ Hacer copia ahora</button>` : ''}
+      ${n.reciente ? `<button class="btn btn-ghost" style="margin-bottom:10px;" onclick="nubeRestaurar('reciente')">↺ Restaurar la última copia</button>` : ''}
+      ${n.anterior ? `<button class="btn btn-ghost" style="margin-bottom:10px;" onclick="nubeRestaurar('anterior')">↺ Restaurar la copia anterior</button>` : ''}
+      ${(n.reciente || n.anterior) ? `<button class="btn btn-ghost" style="color:var(--danger, #e5484d);" onclick="nubeBorrar()">Borrar mis copias de la nube</button>` : ''}
+    </div>`;
+}
+
+function exportBackup(){
+  const payload = buildBackupPayload();
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2895,21 +2955,9 @@ function importBackup(file){
   reader.onload = async (e) => {
     try{
       const payload = JSON.parse(e.target.result);
-      state.cierres = Array.isArray(payload.cierres) ? payload.cierres : [];
-      state.servicios = Array.isArray(payload.servicios) ? payload.servicios : [];
-      state.gastos = Array.isArray(payload.gastos) ? payload.gastos : [];
-      state.mantenimientos = Array.isArray(payload.mantenimientos) ? payload.mantenimientos : [];
-      if(Array.isArray(payload.drivers) && payload.drivers.length === 2) state.drivers = payload.drivers;
-      if(payload.pctEmpresa) state.pctEmpresa = payload.pctEmpresa;
-      if(payload.pctEmpresaPorChofer && typeof payload.pctEmpresaPorChofer === 'object') state.pctEmpresaPorChofer = payload.pctEmpresaPorChofer;
-      if(Array.isArray(payload.tiposMantenimiento) && payload.tiposMantenimiento.length) state.tiposMantenimiento = payload.tiposMantenimiento;
-      if(payload.pins && typeof payload.pins === 'object') state.pins = payload.pins;
-      if(payload.masterPin) state.masterPin = payload.masterPin;
-      if(typeof payload.editRequiereMaster === 'boolean') state.editRequiereMaster = payload.editRequiereMaster;
-      if(!state.drivers.includes(state.driver)) state.driver = state.drivers[0];
-      await saveCierres(); await saveServicios(); await saveGastos(); await saveMantenimientos(); await saveConfig();
+      if(typeof window.nubeForzarSiguiente === 'function') window.nubeForzarSiguiente();
+      await applyBackupPayload(payload);
       showToast('Copia importada correctamente');
-      render();
     }catch(err){
       showToast('El archivo no es una copia de seguridad válida');
     }
@@ -3068,6 +3116,7 @@ import {
   updatePassword,
   updateEmail
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAw9CSXwUEV7Ys4qFHz_CxgZ_9dvWxTIEI",
@@ -3081,6 +3130,129 @@ const firebaseConfig = {
 const firebaseAppInstance = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseAppInstance);
 setPersistence(auth, browserLocalPersistence);
+const db = getFirestore(firebaseAppInstance);
+
+/* ---------- copia automática en la nube ----------
+   copias/{uid}/diarias/reciente  -> estado más reciente (se actualiza al cambiar datos)
+   copias/{uid}/diarias/anterior  -> la última copia de un día anterior
+   Nunca sobrescribe una copia buena con un móvil vacío o con muchos menos datos. */
+const NUBE_KEY = 'taxi-cierre-app:nube-activa';
+const nube = window.mcNubeInfo = { activa:false, cargado:false, reciente:null, anterior:null, aviso:'', ocupado:false };
+let nubeTimer = null, nubeForzar = false;
+window.nubeForzarSiguiente = () => { nubeForzar = true; };
+const nubeRef = (n) => doc(db, 'copias', auth.currentUser.uid, 'diarias', n);
+const pad2 = (n) => String(n).padStart(2, '0');
+function hoyLocal(){ const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+function horaLocal(){ const d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+function nubeRefrescar(){ try{ if(window.mcEnAjustes && window.mcEnAjustes() && typeof window.render === 'function') window.render(); }catch(e){} }
+async function comprimir(texto){
+  if(typeof CompressionStream === 'undefined') return { gz:false, datos:texto };
+  const buf = await new Response(new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  const b = new Uint8Array(buf); let bin = '';
+  for(let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return { gz:true, datos:btoa(bin) };
+}
+async function descomprimir(c){
+  if(!c.gz) return c.datos;
+  const bin = atob(c.datos); const b = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  return await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+async function leerNube(){
+  const [a, b] = await Promise.all([getDoc(nubeRef('reciente')), getDoc(nubeRef('anterior'))]);
+  nube.reciente = a.exists() ? a.data() : null;
+  nube.anterior = b.exists() ? b.data() : null;
+  nube.cargado = true;
+}
+async function hacerCopiaNube(manual){
+  if(!auth.currentUser || nube.ocupado) return false;
+  nube.ocupado = true;
+  try{
+    if(!nube.cargado) await leerNube();
+    const res = window.mcResumen();
+    const prev = nube.reciente;
+    const muchoMenos = prev && prev.resumen && prev.resumen.total >= 5 && res.total < prev.resumen.total * 0.5;
+    if(muchoMenos && !nubeForzar){
+      if(!manual){
+        nube.aviso = 'Este móvil tiene muchos menos datos (' + res.total + ' registros) que tu copia en la nube (' + prev.resumen.total + '). No se ha copiado para no estropear la copia buena. Si has perdido datos, pulsa "Restaurar la última copia".';
+        return false;
+      }
+      if(!confirm('Este móvil tiene muchos menos datos que tu copia en la nube. Si sigues, la copia de la nube se sustituirá por la de este móvil. ¿Continuar?')) return false;
+    }
+    const comp = await comprimir(JSON.stringify(window.mcBuildBackup()));
+    if(comp.datos.length > 900000){ nube.aviso = 'Tus datos son demasiado grandes para la copia en la nube. Usa también la copia manual.'; return false; }
+    const nueva = { fecha: hoyLocal(), hora: horaLocal(), creado: Date.now(), resumen: res, gz: comp.gz, datos: comp.datos };
+    if(prev && prev.fecha !== nueva.fecha){ await setDoc(nubeRef('anterior'), prev); nube.anterior = prev; }
+    await setDoc(nubeRef('reciente'), nueva);
+    nube.reciente = nueva; nube.aviso = ''; nubeForzar = false;
+    return true;
+  }catch(e){
+    console.warn('Copia en la nube', e);
+    nube.aviso = 'No se pudo hacer la copia en la nube (' + (e.code || e.message) + '). Se reintentará al volver a cambiar datos.';
+    return false;
+  }finally{
+    nube.ocupado = false;
+    nubeRefrescar();
+  }
+}
+window.programarCopiaNube = () => {
+  if(!nube.activa || !auth.currentUser) return;
+  clearTimeout(nubeTimer);
+  nubeTimer = setTimeout(() => hacerCopiaNube(false), 15000);
+};
+window.nubeActivar = async (v) => {
+  nube.activa = !!v;
+  try{ localStorage.setItem(NUBE_KEY, v ? '1' : '0'); }catch(e){}
+  nubeRefrescar();
+  if(v && await hacerCopiaNube(false)) showToast('Copia automática activada');
+  else if(!v) showToast('Copia automática desactivada');
+};
+window.nubeCopiarAhora = async () => { if(await hacerCopiaNube(true)) showToast('Copia guardada en la nube'); };
+async function restaurarNube(cual, sinPreguntar){
+  const c = nube[cual];
+  if(!c) return;
+  if(!sinPreguntar && !confirm('Esto sustituirá TODOS los datos de este móvil por la copia del ' + nubeTexto(c) + '. ¿Continuar?')) return;
+  try{
+    const payload = JSON.parse(await descomprimir(c));
+    nubeForzar = true;
+    await window.mcApplyBackup(payload);
+    nube.aviso = '';
+    showToast('Copia restaurada');
+  }catch(e){
+    console.warn(e);
+    showToast('No se pudo restaurar la copia');
+  }
+  nubeRefrescar();
+}
+window.nubeRestaurar = (cual) => restaurarNube(cual, false);
+window.nubeBorrar = async () => {
+  if(!confirm('¿Borrar tus copias de la nube? Los datos de este móvil no se tocan.')) return;
+  try{
+    await Promise.all([deleteDoc(nubeRef('reciente')), deleteDoc(nubeRef('anterior'))]);
+    nube.reciente = null; nube.anterior = null; nube.activa = false;
+    try{ localStorage.setItem(NUBE_KEY, '0'); }catch(e){}
+    showToast('Copias de la nube borradas');
+  }catch(e){ showToast('No se pudieron borrar (' + (e.code || e.message) + ')'); }
+  nubeRefrescar();
+};
+async function iniciarNube(){
+  for(let i = 0; i < 60 && !(window.mcDatosCargados && window.mcDatosCargados()); i++) await new Promise(r => setTimeout(r, 200));
+  try{ await leerNube(); }
+  catch(e){ console.warn(e); nube.cargado = true; nube.aviso = 'No se pudo consultar la copia en la nube (' + (e.code || e.message) + ').'; nubeRefrescar(); return; }
+  let guardado = null; try{ guardado = localStorage.getItem(NUBE_KEY); }catch(e){}
+  nube.activa = guardado === '1' || (guardado === null && !!nube.reciente);
+  if(nube.activa && guardado === null){ try{ localStorage.setItem(NUBE_KEY, '1'); }catch(e){} }
+  const res = window.mcResumen();
+  if(nube.reciente && nube.reciente.resumen && nube.reciente.resumen.total > 0 && res.total === 0){
+    if(confirm('Este móvil no tiene datos, pero tienes una copia en la nube del ' + nubeTexto(nube.reciente) + '. ¿Quieres restaurarla ahora?')){
+      nube.activa = true; try{ localStorage.setItem(NUBE_KEY, '1'); }catch(e){}
+      await restaurarNube('reciente', true);
+      return;
+    }
+  }
+  if(nube.activa && (!nube.reciente || nube.reciente.fecha !== hoyLocal())) await hacerCopiaNube(false);
+  nubeRefrescar();
+}
 
 function mensajeError(codigo, generico){
   const mapa = {
@@ -3203,6 +3375,7 @@ onAuthStateChanged(auth, (user) => {
       if(typeof window.loadData === 'function') window.loadData();
     }
     revalidarConexion();
+    iniciarNube();
   } else {
     try{ localStorage.removeItem('mc-had-session'); }catch(e){}
     if(typeof window.hideApp === 'function') window.hideApp();

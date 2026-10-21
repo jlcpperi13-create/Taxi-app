@@ -110,6 +110,9 @@ input,select{font-family:inherit;}
 
 .entry{border-bottom:1px solid var(--hair); padding:12px 0;}
 .entry.pago-no-efectivo{border-left:3px solid var(--teal); padding-left:10px; background:rgba(63,167,150,0.07);}
+.entry.pago-transf{border-left:3px solid #7AA7FF; padding-left:10px; background:rgba(122,167,255,0.09);}
+.tag.tag-tarjeta{color:var(--teal); border-color:var(--teal);}
+.tag.tag-transf{color:#7AA7FF; border-color:#7AA7FF;}
 .entry:last-child{border-bottom:none;}
 .entry-top{display:flex; justify-content:space-between; align-items:baseline;}
 .entry-date{font-size:15px; font-weight:600;}
@@ -1173,10 +1176,17 @@ function cierreRowHTML(d){
   </div>`;
 }
 
+/* Color de cada servicio en las listas según cómo se cobró */
+function clasePago(p){ return p === 'transf' ? 'pago-transf' : (p && p !== 'efectivo') ? 'pago-no-efectivo' : ''; }
+function etiquetaPago(p){
+  if(p === 'transf') return '<span class="tag tag-transf">transferencia</span>';
+  if(p === 'tarjeta' || p === 'tpv') return '<span class="tag tag-tarjeta">tarjeta</span>';
+  return `<span class="tag">${p || 'efectivo'}</span>`;
+}
 function archivedServicioRowHTML(s, cierreId){
   const dt = new Date(s.fecha + 'T00:00:00');
   const propina = +s.propina || 0;
-  return `<div class="entry ${s.pago!=='efectivo'?'pago-no-efectivo':''}" onclick="editServicioArchivado('${cierreId}','${s.id}')" style="cursor:pointer;">
+  return `<div class="entry ${clasePago(s.pago)}" onclick="editServicioArchivado('${cierreId}','${s.id}')" style="cursor:pointer;">
     <div class="entry-top">
       <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
@@ -1184,7 +1194,7 @@ function archivedServicioRowHTML(s, cierreId){
     <div class="entry-meta">${[s.origen,s.destino].filter(Boolean).join(' → ') || 'Sin ruta'} ${s.taxi ? '· taxi '+s.taxi : ''}</div>
     <div class="entry-tags">
       <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
-      <span class="tag">${s.pago}</span>
+      ${etiquetaPago(s.pago)}
       ${s.descuentoPct ? `<span class="tag">-${fmt(s.descuentoPct)}%</span>` : ''}
       ${s.autopistaIncluida ? `<span class="tag">+autopista €${fmt(s.autopistaIncluida)}</span>` : ''}
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}
@@ -1899,7 +1909,7 @@ function renderServiciosTab(c){
 function servicioRowHTML(s){
   const dt = new Date(s.fecha + 'T00:00:00');
   const propina = +s.propina || 0;
-  return `<div class="entry ${s.pago!=='efectivo'?'pago-no-efectivo':''}" onclick="editServicio('${s.id}')" style="cursor:pointer;">
+  return `<div class="entry ${clasePago(s.pago)}" onclick="editServicio('${s.id}')" style="cursor:pointer;">
     <div class="entry-top">
       <div class="entry-date">${s.cliente || 'Sin cliente'} <span style="color:var(--muted); font-weight:400; font-size:12px;">· ${dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}${s.hora ? ' · ' + s.hora : ''}</span></div>
       <div class="entry-amount">€${fmt(+s.importe||0)}${propina ? ` <span style="color:var(--teal);">+€${fmt(propina)}</span>` : ''}</div>
@@ -1907,7 +1917,7 @@ function servicioRowHTML(s){
     <div class="entry-meta">${[s.origen,s.destino].filter(Boolean).join(' → ') || 'Sin ruta'} ${s.taxi ? '· taxi '+s.taxi : ''}</div>
     <div class="entry-tags">
       <span class="tag ${s.estado}">${s.estado==='pag'?'Pagado':s.estado==='pend'?'Pendiente':'Anulado'}</span>
-      <span class="tag">${s.pago}</span>
+      ${etiquetaPago(s.pago)}
       ${s.descuentoPct ? `<span class="tag">-${fmt(s.descuentoPct)}%</span>` : ''}
       ${s.autopistaIncluida ? `<span class="tag">+autopista €${fmt(s.autopistaIncluida)}</span>` : ''}
       ${propina ? `<span class="tag pag">propina €${fmt(propina)}</span>` : ''}

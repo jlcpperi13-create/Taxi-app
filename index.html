@@ -1075,7 +1075,7 @@ function renderCierreTab(c){
       ${state.addingServicioArchivado ? nuevoServicioArchivadoFormHTML(editing)
         : `<button class="btn btn-ghost" style="margin-bottom:10px;" onclick="state.addingServicioArchivado=true; state.editingServicioArchivadoId=null; render();">+ Añadir servicio olvidado</button>`}
       ${state.editingServicioArchivadoId ? servicioArchivadoFormHTML(editing) : ''}
-      ${Array.isArray(editing.serviciosArchivados) ? editing.serviciosArchivados.map(s => archivedServicioRowHTML(s, editing.id)).join('') : ''}
+      ${Array.isArray(editing.serviciosArchivados) ? ordenarPorHora(editing.serviciosArchivados).map(s => archivedServicioRowHTML(s, editing.id)).join('') : ''}
     </div>` : ''}
 
     ${editing && Array.isArray(editing.gastosArchivados) && editing.gastosArchivados.length ? `
@@ -1176,6 +1176,10 @@ function cierreRowHTML(d){
   </div>`;
 }
 
+/* Ordena servicios por fecha y hora (los que no tienen hora, al final de su día) */
+function ordenarPorHora(lista){
+  return [...lista].sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||'') || (a.hora||'99:99').localeCompare(b.hora||'99:99'));
+}
 /* Color de cada servicio en las listas según cómo se cobró */
 function clasePago(p){ return p === 'transf' ? 'pago-transf' : (p && p !== 'efectivo') ? 'pago-no-efectivo' : ''; }
 function etiquetaPago(p){
@@ -1338,6 +1342,7 @@ async function addServicioArchivado(cierreId){
   };
   if(!Array.isArray(cierre.serviciosArchivados)) cierre.serviciosArchivados = [];
   cierre.serviciosArchivados.push(s);
+  cierre.serviciosArchivados = ordenarPorHora(cierre.serviciosArchivados);
   if(sumar && estado !== 'anulado'){
     cierre.facturado = round2((+cierre.facturado || 0) + importeFinal);
   }
@@ -1817,7 +1822,7 @@ async function deleteGastoConfirm(id){
 function renderServiciosTab(c){
   const propios = state.servicios.filter(s => s.chofer === state.driver);
   const grouped = {};
-  [...propios].sort((a,b)=> b.fecha.localeCompare(a.fecha)).forEach(s => {
+  [...propios].sort((a,b)=> b.fecha.localeCompare(a.fecha) || (a.hora||'').localeCompare(b.hora||'')).forEach(s => {
     const k = monthKey(s.fecha);
     (grouped[k] = grouped[k] || []).push(s);
   });

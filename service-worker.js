@@ -1,4 +1,4 @@
-const CACHE_NAME = "micontable-cache-v6";
+const CACHE_NAME = "micontable-cache-v7";
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
@@ -29,38 +29,29 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// index.html y navegación: se muestra al instante la copia guardada (para que abrir sea rápido),
-// y en paralelo se descarga la versión más reciente en segundo plano para la próxima vez.
+// Solo se guardan los archivos de la app y los de Firebase (versión fija).
+// Firestore, el inicio de sesión y la copia en la nube van siempre directos a internet.
+const FIREBASE_JS = /^https:\/\/www\.gstatic\.com\/firebasejs\/10\.13\.1\//;
+function guardar(cache, req, r) {
+  if (r && r.ok) cache.put(req, r.clone()).catch(() => {});
+  return r;
+}
 self.addEventListener("fetch", (event) => {
-  const isNavigation = event.request.mode === "navigate" || event.request.url.endsWith("index.html") || event.request.url.endsWith("/") || event.request.url.endsWith("manifest.json");
-  if (isNavigation) {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin && !FIREBASE_JS.test(req.url)) return;
+  const esPagina = req.mode === "navigate" || url.pathname.endsWith("index.html") || url.pathname.endsWith("/") || url.pathname.endsWith("manifest.json");
+  if (esPagina) {
+    // Copia guardada al instante; la versión nueva se descarga por detrás para la próxima vez.
+    const red = caches.open(CACHE_NAME).then(cache => fetch(req).then(r => guardar(cache, req, r)));
+    event.waitUntil(red.catch(() => {}));
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
-        cache.match(event.request).then((cachedResponse) => {
-          const networkFetch = fetch(event.request)
-            .then((networkResponse) => {
-              cache.put(event.request, networkResponse.clone());
-              return networkResponse;
-            })
-            .catch(() => cachedResponse);
-          return cachedResponse || networkFetch;
-        })
-      )
+      caches.match(req, { ignoreSearch: true }).then(c => c || red).catch(() => caches.match("./index.html"))
     );
     return;
   }
-  // Otros archivos (íconos, manifest): caché primero, red como respaldo.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response.clone());
-            return response;
-          });
-        }).catch(() => cached)
-      );
-    })
+    caches.match(req).then(c => c || caches.open(CACHE_NAME).then(cache => fetch(req).then(r => guardar(cache, req, r))))
   );
 });

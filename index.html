@@ -1062,8 +1062,8 @@ function renderCierreTab(c){
         <div class="meter-cell"><div class="label">Otros gastos</div><div class="value mono" id="calc-gastos-otros" style="font-size:14px;">€${fmt(calc.gastosDetalle.otros)}</div></div>
       </div>
       <div class="row2" style="margin-top:10px;">
-        <div class="meter-cell"><div class="label">Autopista (efectivo)</div><div class="value mono" id="calc-gastos-autopista-efectivo" style="font-size:14px;">€${fmt(calc.gastosDetalle.autopistaEfectivo)}</div></div>
-        <div class="meter-cell"><div class="label">Autopista (tarjeta)</div><div class="value mono" id="calc-gastos-autopista-tarjeta" style="font-size:14px;">€${fmt(calc.gastosDetalle.autopistaTarjeta)}</div></div>
+        <div class="meter-cell"><div class="label">Autopista efectivo (no suma)</div><div class="value mono" id="calc-gastos-autopista-efectivo" style="font-size:14px;">€${fmt(calc.gastosDetalle.autopistaEfectivo)}</div></div>
+        <div class="meter-cell"><div class="label">Autopista tarjeta (no suma)</div><div class="value mono" id="calc-gastos-autopista-tarjeta" style="font-size:14px;">€${fmt(calc.gastosDetalle.autopistaTarjeta)}</div></div>
       </div>
       <button class="btn btn-ghost" style="margin-top:10px; font-size:13px;" id="btn-goto-gastos" onclick="gotoGastosFor('${d.fecha}')">+ Anotar gasto de este día</button>
     </div>
@@ -2281,7 +2281,7 @@ function renderMensualTab(c){
         <div class="meter-cell"><div class="label">Gastos fijos</div><div class="value mono" style="font-size:14px;">€${fmt(gastosFijosTotal)}</div></div>
       </div>
       <div class="row2" style="margin-bottom:10px;">
-        <div class="meter-cell"><div class="label">Autopista</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
+        <div class="meter-cell"><div class="label">Autopista (no es gasto)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
         <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${serviciosTotal}</div></div>
       </div>
       <div class="subhead" style="margin-top:4px;">Desglose de gastos variables</div>
@@ -2291,10 +2291,10 @@ function renderMensualTab(c){
       </div>
       <div class="row2" style="margin-bottom:10px;">
         <div class="meter-cell"><div class="label">Otros gastos</div><div class="value mono" style="font-size:13px;">€${fmt(totals.otrosGastos)}</div></div>
-        <div class="meter-cell"><div class="label">Autopista (efectivo)</div><div class="value mono" style="font-size:13px;">€${fmt(totals.autopistaEfectivo)}</div></div>
+        <div class="meter-cell"><div class="label">Autopista efectivo (no suma)</div><div class="value mono" style="font-size:13px;">€${fmt(totals.autopistaEfectivo)}</div></div>
       </div>
       <div class="meter-cell">
-        <div class="label">Autopista (tarjeta)</div>
+        <div class="label">Autopista tarjeta (no suma)</div>
         <div class="value mono" style="font-size:13px;">€${fmt(totals.autopistaTarjeta)}</div>
       </div>
     </div>
@@ -2403,7 +2403,7 @@ function renderAnualTab(c){
           <div class="meter-cell"><div class="label">Gastos fijos</div><div class="value mono" style="font-size:14px;">€${fmt(totals.gastosFijos)}</div></div>
         </div>
         <div class="row2" style="margin-bottom:10px;">
-          <div class="meter-cell"><div class="label">Autopista</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
+          <div class="meter-cell"><div class="label">Autopista (no es gasto)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
           <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${totals.servicios}</div></div>
         </div>
         <div class="subhead" style="margin-top:4px;">Desglose de gastos variables</div>
@@ -2413,10 +2413,10 @@ function renderAnualTab(c){
         </div>
         <div class="row2" style="margin-bottom:10px;">
           <div class="meter-cell"><div class="label">Otros gastos</div><div class="value mono" style="font-size:13px;">€${fmt(totals.otrosGastos)}</div></div>
-          <div class="meter-cell"><div class="label">Autopista (efectivo)</div><div class="value mono" style="font-size:13px;">€${fmt(totals.autopistaEfectivo)}</div></div>
+          <div class="meter-cell"><div class="label">Autopista efectivo (no suma)</div><div class="value mono" style="font-size:13px;">€${fmt(totals.autopistaEfectivo)}</div></div>
         </div>
         <div class="meter-cell">
-          <div class="label">Autopista (tarjeta)</div>
+          <div class="label">Autopista tarjeta (no suma)</div>
           <div class="value mono" style="font-size:13px;">€${fmt(totals.autopistaTarjeta)}</div>
         </div>
       </div>
@@ -2485,7 +2485,8 @@ function drawDashboardCards(doc, marginX, y, contentWidth, cards){
 }
 
 function tarjetasDesdeTotales(totals, extra){
-  const gastosTotales = totals.gastosVar + (extra.gastosFijos||0) + totals.autopista;
+  // La autopista la paga el cliente: no es un gasto soportado, no suma en los gastos
+  const gastosTotales = totals.gastosVar + (extra.gastosFijos||0);
   return [
     { label:'EFECTIVO DE EMPRESA', value:`€${fmt(totals.efectivoEmpresa)}`, color:[46,125,80] },
     { label:'COBRADO TARJETA/TRANSF.', value:`€${fmt(totals.cardServicios)}`, color:[41,98,153] },
@@ -2563,12 +2564,14 @@ function seccionesDesdeTotales(totals, extra){
     ]},
     { heading:'Gastos y servicios', color:[178,58,58], rows:[
       ['Gastos variables', `€${fmt(totals.gastosVar)}`],
-      ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
-      ['Autopista', `€${fmt(totals.autopista)}`],
-      ['Servicios', `${extra.servicios}`],
       ['— Gasolina', `€${fmt(totals.gasolina)}`],
       ['— Gastos tarjeta', `€${fmt(totals.gastosTarjeta)}`],
       ['— Otros gastos', `€${fmt(totals.otrosGastos)}`],
+      ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
+      ['Servicios', `${extra.servicios}`],
+    ]},
+    { heading:'Autopista (la paga el cliente, no cuenta como gasto)', color:[110,110,120], rows:[
+      ['Autopista total', `€${fmt(totals.autopista)}`],
       ['— Autopista (efectivo)', `€${fmt(totals.autopistaEfectivo)}`],
       ['— Autopista (tarjeta)', `€${fmt(totals.autopistaTarjeta)}`],
     ]},

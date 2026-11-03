@@ -1176,6 +1176,16 @@ function cierreRowHTML(d){
   </div>`;
 }
 
+/* Servicios cobrados por transferencia: solo informativo, no entra en ninguna cuenta */
+function transfInfo(lista){
+  const t = lista.filter(s => s.pago === 'transf' && s.estado !== 'anulado');
+  // Importe + autopista + propina: todo es dinero electrónico que aún no ha entrado en el banco
+  return { n: t.length, importe: round2(t.reduce((a,s)=> a + (+s.importe||0) + (+s.autopistaIncluida||0) + (+s.propina||0), 0)) };
+}
+function transfTexto(ti){ return `${ti.n} servicio${ti.n===1?'':'s'} · €${fmt(ti.importe)}`; }
+function transfCeldaHTML(ti){
+  return `<div class="meter-cell" style="margin-bottom:10px; border-left:3px solid #7AA7FF;"><div class="label">Por transferencia (solo informativo, no suma)</div><div class="value mono" style="font-size:14px; color:#7AA7FF;">${transfTexto(ti)}</div></div>`;
+}
 /* Ordena servicios por fecha y hora (los que no tienen hora, al final de su día) */
 function ordenarPorHora(lista){
   return [...lista].sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||'') || (a.hora||'99:99').localeCompare(b.hora||'99:99'));
@@ -2284,6 +2294,7 @@ function renderMensualTab(c){
         <div class="meter-cell"><div class="label">Autopista (no es gasto)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
         <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${serviciosTotal}</div></div>
       </div>
+      ${transfCeldaHTML(transfInfo(serviciosMes))}
       <div class="subhead" style="margin-top:4px;">Desglose de gastos variables</div>
       <div class="row2" style="margin-bottom:10px;">
         <div class="meter-cell"><div class="label">Gasolina</div><div class="value mono" style="font-size:13px;">€${fmt(totals.gasolina)}</div></div>
@@ -2406,6 +2417,7 @@ function renderAnualTab(c){
           <div class="meter-cell"><div class="label">Autopista (no es gasto)</div><div class="value mono" style="font-size:14px;">€${fmt(totals.autopista)}</div></div>
           <div class="meter-cell"><div class="label">Servicios</div><div class="value mono" style="font-size:14px;">${totals.servicios}</div></div>
         </div>
+        ${transfCeldaHTML(transfInfo(todosLosServicios().filter(s => monthKey(s.fecha).startsWith(y))))}
         <div class="subhead" style="margin-top:4px;">Desglose de gastos variables</div>
         <div class="row2" style="margin-bottom:10px;">
           <div class="meter-cell"><div class="label">Gasolina</div><div class="value mono" style="font-size:13px;">€${fmt(totals.gasolina)}</div></div>
@@ -2569,6 +2581,7 @@ function seccionesDesdeTotales(totals, extra){
       ['— Otros gastos', `€${fmt(totals.otrosGastos)}`],
       ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
       ['Servicios', `${extra.servicios}`],
+      ...(extra.transf ? [['— Por transferencia (informativo)', transfTexto(extra.transf)]] : []),
     ]},
     { heading:'Autopista (la paga el cliente, no cuenta como gasto)', color:[110,110,120], rows:[
       ['Autopista total', `€${fmt(totals.autopista)}`],
@@ -2653,7 +2666,7 @@ function totalesMes(mes){
   totals.dias = fechasUnicas.size;
   const serviciosTotal = serviciosMes.length;
   const gastosFijosTotal = gastosFijosMes.reduce((s,g)=> s + (+g.importe||0), 0);
-  return { totals, extra: { servicios: serviciosTotal, gastosFijos: gastosFijosTotal } };
+  return { totals, extra: { servicios: serviciosTotal, gastosFijos: gastosFijosTotal, transf: transfInfo(serviciosMes) } };
 }
 
 function nombreArchivoMes(mes){
@@ -2725,7 +2738,7 @@ function totalesAnio(year){
     Object.keys(acc).forEach(key => acc[key] += byMonth[m][key]);
     return acc;
   }, {facturado:0,efectivo:0,efectivoEmpresa:0,cardServicios:0,gastosVar:0,gastosFijos:0,autopista:0,gasolina:0,gastosTarjeta:0,otrosGastos:0,autopistaEfectivo:0,autopistaTarjeta:0,servicios:0,empresa:0,chofer:0,propinas:0,dias:0,km:0});
-  return { totals, extra: { servicios: totals.servicios, gastosFijos: totals.gastosFijos } };
+  return { totals, extra: { servicios: totals.servicios, gastosFijos: totals.gastosFijos, transf: transfInfo(todosLosServicios().filter(s => monthKey(s.fecha).startsWith(year))) } };
 }
 
 function nombreArchivoAnio(year){

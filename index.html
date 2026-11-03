@@ -111,8 +111,10 @@ input,select{font-family:inherit;}
 .entry{border-bottom:1px solid var(--hair); padding:12px 0;}
 .entry.pago-no-efectivo{border-left:3px solid var(--teal); padding-left:10px; background:rgba(63,167,150,0.07);}
 .entry.pago-transf{border-left:3px solid #7AA7FF; padding-left:10px; background:rgba(122,167,255,0.09);}
+.entry.pago-abonado{border-left:3px solid #B48CF2; padding-left:10px; background:rgba(180,140,242,0.09);}
 .tag.tag-tarjeta{color:var(--teal); border-color:var(--teal);}
 .tag.tag-transf{color:#7AA7FF; border-color:#7AA7FF;}
+.tag.tag-abonado{color:#B48CF2; border-color:#B48CF2;}
 .entry:last-child{border-bottom:none;}
 .entry-top{display:flex; justify-content:space-between; align-items:baseline;}
 .entry-date{font-size:15px; font-weight:600;}
@@ -654,7 +656,7 @@ function dictarSelect(selectId, mapaPalabras, btnEl){
 
 /* Dictado combinado: reconoce en una sola frase el importe y la forma de pago
    (ej. "20 euros con tarjeta" o "15 con 50 en efectivo") y rellena ambos campos. */
-const PAGO_PALABRAS_MAPA = {efectivo:['efectivo','contado'], tarjeta:['tarjeta','tarjetas'], transf:['transferencia','transferencias']};
+const PAGO_PALABRAS_MAPA = {efectivo:['efectivo','contado'], tarjeta:['tarjeta','tarjetas'], transf:['transferencia','transferencias'], abonado:['abonado','abonados']};
 function extraerFormaPago(texto){
   for(const valor in PAGO_PALABRAS_MAPA){
     for(const palabra of PAGO_PALABRAS_MAPA[valor]){
@@ -664,7 +666,7 @@ function extraerFormaPago(texto){
   return null;
 }
 function quitarPalabrasDePago(texto){
-  return texto.replace(/\b(en|con|por|de)?\s*(efectivo|contado|tarjetas?|transferencias?)\b/gi, ' ').replace(/\s+/g,' ').trim();
+  return texto.replace(/\b(en|con|por|de)?\s*(efectivo|contado|tarjetas?|transferencias?|abonados?)\b/gi, ' ').replace(/\s+/g,' ').trim();
 }
 function dictarImporteYPago(importeId, selectId, btnEl, autoGuardar){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -806,7 +808,8 @@ function cierreCalc(d){
   const kmInicio = +d.kmInicio || 0;
   const kmFin = +d.kmFin || 0;
   const serviciosDia = serviciosDeCierre(d).filter(s => s.estado !== 'anulado');
-  const conTarjeta = s => s.pago === 'tarjeta' || s.pago === 'tpv' || s.pago === 'transf';
+  // Abonado: se cobra por TPV más tarde; en las cuentas cuenta igual que tarjeta/TPV
+  const conTarjeta = s => s.pago === 'tarjeta' || s.pago === 'tpv' || s.pago === 'transf' || s.pago === 'abonado';
   const cardServicios = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.importe||0), 0));
   const propinas = round2(serviciosDia.filter(conTarjeta).reduce((s,x)=> s + (+x.propina||0), 0));
   /* Propinas cobradas en efectivo: ya están físicamente en la mano del chofer, así que van
@@ -1178,22 +1181,23 @@ function cierreRowHTML(d){
 
 /* Servicios cobrados por transferencia: solo informativo, no entra en ninguna cuenta */
 function transfInfo(lista){
-  const t = lista.filter(s => s.pago === 'transf' && s.estado !== 'anulado');
+  const t = lista.filter(s => (s.pago === 'transf' || s.pago === 'abonado') && s.estado !== 'anulado');
   // Importe + autopista + propina: todo es dinero electrónico que aún no ha entrado en el banco
   return { n: t.length, importe: round2(t.reduce((a,s)=> a + (+s.importe||0) + (+s.autopistaIncluida||0) + (+s.propina||0), 0)) };
 }
 function transfTexto(ti){ return `${ti.n} servicio${ti.n===1?'':'s'} · €${fmt(ti.importe)}`; }
 function transfCeldaHTML(ti){
-  return `<div class="meter-cell" style="margin-bottom:10px; border-left:3px solid #7AA7FF;"><div class="label">Por transferencia (solo informativo, no suma)</div><div class="value mono" style="font-size:14px; color:#7AA7FF;">${transfTexto(ti)}</div></div>`;
+  return `<div class="meter-cell" style="margin-bottom:10px; border-left:3px solid #7AA7FF;"><div class="label">Transferencias y abonados (solo informativo, no suma)</div><div class="value mono" style="font-size:14px; color:#7AA7FF;">${transfTexto(ti)}</div></div>`;
 }
 /* Ordena servicios por fecha y hora (los que no tienen hora, al final de su día) */
 function ordenarPorHora(lista){
   return [...lista].sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||'') || (a.hora||'99:99').localeCompare(b.hora||'99:99'));
 }
 /* Color de cada servicio en las listas según cómo se cobró */
-function clasePago(p){ return p === 'transf' ? 'pago-transf' : (p && p !== 'efectivo') ? 'pago-no-efectivo' : ''; }
+function clasePago(p){ return p === 'transf' ? 'pago-transf' : p === 'abonado' ? 'pago-abonado' : (p && p !== 'efectivo') ? 'pago-no-efectivo' : ''; }
 function etiquetaPago(p){
   if(p === 'transf') return '<span class="tag tag-transf">transferencia</span>';
+  if(p === 'abonado') return '<span class="tag tag-abonado">abonado</span>';
   if(p === 'tarjeta' || p === 'tpv') return '<span class="tag tag-tarjeta">tarjeta</span>';
   return `<span class="tag">${p || 'efectivo'}</span>`;
 }
@@ -1245,6 +1249,7 @@ function servicioArchivadoFormHTML(cierre){
           <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
           <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
           <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
+          <option value="abonado" ${s.pago==='abonado'?'selected':''}>Abonado (TPV más tarde)</option>
         </select>
       </div>
       <div><label>Estado</label>
@@ -1294,6 +1299,7 @@ function nuevoServicioArchivadoFormHTML(cierre){
           <option value="efectivo">Efectivo</option>
           <option value="tarjeta">Tarjeta</option>
           <option value="transf">Transferencia</option>
+          <option value="abonado">Abonado (TPV más tarde)</option>
         </select>
       </div>
       <div><label>Estado</label>
@@ -1879,6 +1885,7 @@ function renderServiciosTab(c){
               <option value="efectivo" ${s.pago==='efectivo'?'selected':''}>Efectivo</option>
               <option value="tarjeta" ${s.pago==='tarjeta'?'selected':''}>Tarjeta</option>
               <option value="transf" ${s.pago==='transf'?'selected':''}>Transferencia</option>
+              <option value="abonado" ${s.pago==='abonado'?'selected':''}>Abonado (TPV más tarde)</option>
             </select>
             <button type="button" class="mic-btn" onclick="dictarSelect('s-pago', {efectivo:['efectivo','contado','cash'], tarjeta:['tarjeta','tarjetas','card'], transf:['transferencia','transferencias']}, this)" title="Dictar forma de pago">🎤</button>
           </div>
@@ -2581,7 +2588,7 @@ function seccionesDesdeTotales(totals, extra){
       ['— Otros gastos', `€${fmt(totals.otrosGastos)}`],
       ['Gastos fijos', `€${fmt(extra.gastosFijos)}`],
       ['Servicios', `${extra.servicios}`],
-      ...(extra.transf ? [['— Por transferencia (informativo)', transfTexto(extra.transf)]] : []),
+      ...(extra.transf ? [['— Transferencias y abonados (informativo)', transfTexto(extra.transf)]] : []),
     ]},
     { heading:'Autopista (la paga el cliente, no cuenta como gasto)', color:[110,110,120], rows:[
       ['Autopista total', `€${fmt(totals.autopista)}`],

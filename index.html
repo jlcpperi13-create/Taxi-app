@@ -352,6 +352,26 @@ const round2 = (n) => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const todayISO = () => new Date().toISOString().slice(0,10);
 const horaActualHHMM = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
 const monthKey = (iso) => iso.slice(0,7);
+/* Mes siguiente / anterior de un 'AAAA-MM' */
+const mesMas = (mk, n) => { const [y,m] = mk.split('-').map(Number); const d = new Date(y, m-1+n, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
+/* Gastos fijos que cuentan en un mes: los de ese mes y los que se repiten cada mes y lo cubren */
+function gastosFijosDeMes(mes){
+  return state.gastos.filter(g => g.tipo === 'periodico' && (
+    g.repetir ? (monthKey(g.fecha) <= mes && (!g.hasta || mes <= g.hasta)) : monthKey(g.fecha) === mes));
+}
+/* Suma los gastos fijos mes a mes (hasta el mes actual) en un resumen agrupado por meses */
+function sumarGastosFijosPorMes(ensure, year){
+  const per = state.gastos.filter(g => g.tipo === 'periodico');
+  if(!per.length) return;
+  const hoy = monthKey(todayISO());
+  let m = per.map(g => monthKey(g.fecha)).sort()[0];
+  const ultimo = per.reduce((mx, g) => { const f = g.repetir ? hoy : monthKey(g.fecha); return f > mx ? f : mx; }, hoy);
+  for(let i = 0; m <= ultimo && i < 600; i++, m = mesMas(m, 1)){
+    if(year && !m.startsWith(year)) continue;
+    const t = gastosFijosDeMes(m).reduce((a,g)=> a + (+g.importe||0), 0);
+    if(t) ensure(m).gastosFijos += t;
+  }
+}
 const monthLabel = (key) => {
   const [y,m] = key.split('-');
   const names = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -1676,7 +1696,7 @@ function renderGastosTab(c){
       <button class="${tipo==='periodico'?'active':''}" ${editing ? '' : `onclick="setGastoTipo('periodico')"`}>Periódico</button>
     </div>
     <div class="card">
-      ${tipo === 'diario' ? '<details class="notice-toggle"><summary>Info</summary><div class="notice">Se suma automáticamente al cierre de la fecha elegida.</div></details>' : '<details class="notice-toggle"><summary>Info</summary><div class="notice">No afecta al cierre diario, pero cuenta como gasto fijo en el resumen anual.</div></details>'}
+      ${tipo === 'diario' ? '<details class="notice-toggle"><summary>Info</summary><div class="notice">Se suma automáticamente al cierre de la fecha elegida.</div></details>' : '<details class="notice-toggle"><summary>Info</summary><div class="notice">No afecta al cierre diario, pero cuenta como gasto fijo en el resumen mensual y anual. Si lo marcas como "Se repite cada mes", cuenta en todos los meses del periodo sin volver a anotarlo.</div></details>'}
       <div class="field"><label>Fecha</label><input type="date" id="g-fecha" value="${g.fecha}"></div>
       <div class="field"><label>Categoría</label>
         ${tipo === 'periodico' ? `
@@ -1697,6 +1717,23 @@ function renderGastosTab(c){
         </div>
       </div>
       <div class="field"><label>Nota (opcional)</label><input type="text" id="g-nota" value="${g.nota||''}" placeholder="Detalle, proveedor, referencia…"></div>
+      ${tipo === 'periodico' ? `
+      <label style="display:flex; align-items:center; gap:10px; margin:4px 0 12px; cursor:pointer;">
+        <input type="checkbox" id="g-repetir" ${g.repetir?'checked':''} onchange="document.getElementById('g-hasta-wrap').style.display=this.checked?'block':'none'" style="width:22px; height:22px; min-height:0; flex:none;">
+        <span><b>Se repite cada mes</b> con este mismo importe, desde el mes de la fecha</span>
+      </label>
+      <div class="field" id="g-hasta-wrap" style="display:${g.repetir?'block':'none'};"><label>Hasta (mes, opcional — déjalo vacío si no tiene fin)</label><input type="month" id="g-hasta" value="${g.hasta||''}"></div>
+      ${editing && editing.repetir ? `
+      <div class="card" style="border-color:var(--amber-dim); margin:4px 0 12px;">
+        <div class="subhead">¿Ha cambiado la cuota?</div>
+        <div class="entry-meta" style="margin-bottom:10px;">Pon desde qué mes y el importe nuevo. Los meses anteriores se quedan con la cuota de antes. ("Guardar cambios" de abajo corrige <b>todos</b> los meses.)</div>
+        <div class="row2 field">
+          <div><label>Desde el mes</label><input type="month" id="g-cambio-mes" value="${monthKey(todayISO()) > monthKey(editing.fecha) ? monthKey(todayISO()) : mesMas(monthKey(editing.fecha), 1)}"></div>
+          <div><label>Nuevo importe (€)</label><input type="number" step="0.01" id="g-cambio-importe" placeholder="0.00"></div>
+        </div>
+        <button class="btn btn-primary" onclick="cambiarCuotaGasto('${editing.id}')">Cambiar cuota desde ese mes</button>
+      </div>` : ''}
+      ` : ''}
       <div class="btn-row">
         ${editing ? `<button class="btn btn-danger" onclick="deleteGastoConfirm('${editing.id}')">Eliminar</button>` : ''}
         <button class="btn btn-primary" onclick="saveGasto('${tipo}'${editing ? `, '${editing.id}'` : ''})">${editing ? 'Guardar cambios' : 'Añadir gasto'}</button>
@@ -1718,6 +1755,7 @@ function gastoRowHTML(g, cats){
       <div class="entry-amount">€${fmt(+g.importe||0)}</div>
     </div>
     <div class="entry-meta">${g.nota || 'Sin nota'} ${g.chofer ? '· ' + g.chofer : ''}</div>
+    ${g.repetir ? `<div class="entry-tags"><span class="tag" style="color:var(--amber); border-color:var(--amber);">🔁 cada mes · ${monthLabel(monthKey(g.fecha))}${g.hasta ? ' → ' + monthLabel(g.hasta) : ' → sin fin'}</span></div>` : ''}
   </div>`;
 }
 
@@ -1812,6 +1850,14 @@ async function saveGasto(tipo, id){
     nota: document.getElementById('g-nota').value.trim(),
     chofer: state.driver,
   };
+  const repEl = document.getElementById('g-repetir');
+  if(tipo === 'periodico' && repEl && repEl.checked){
+    g.repetir = true;
+    g.hasta = (document.getElementById('g-hasta') || {}).value || '';
+    if(g.hasta && g.hasta < monthKey(g.fecha)){ showToast('El mes "hasta" no puede ser anterior a la fecha'); return; }
+    const prev = id ? state.gastos.find(x=>x.id===id) : null;
+    if(prev && prev.sigueDe) g.sigueDe = prev.sigueDe;
+  }
   if(id){
     const idx = state.gastos.findIndex(x=>x.id===id);
     state.gastos[idx] = g;
@@ -1822,6 +1868,28 @@ async function saveGasto(tipo, id){
   state.editingGastoId = null;
   await saveGastos();
   showToast(id ? 'Gasto actualizado' : 'Gasto anotado');
+  render();
+}
+
+/* Subida (o bajada) de cuota de un gasto fijo que se repite: el tramo actual termina el mes
+   anterior y empieza uno nuevo con el importe nuevo. Los meses pasados no cambian. */
+async function cambiarCuotaGasto(id){
+  const g = state.gastos.find(x=>x.id===id); if(!g || !g.repetir) return;
+  const mes = (document.getElementById('g-cambio-mes') || {}).value;
+  const imp = (document.getElementById('g-cambio-importe') || {}).value;
+  if(!mes){ showToast('Elige desde qué mes'); return; }
+  if(!imp || +imp <= 0){ showToast('Indica el nuevo importe'); return; }
+  const inicio = monthKey(g.fecha);
+  if(mes <= inicio){ showToast('Ese mes es el primero de la cuota: usa "Guardar cambios" para corregirla'); return; }
+  if(g.hasta && mes > g.hasta){ showToast('Ese mes está fuera del periodo de este gasto'); return; }
+  const dia = g.fecha.slice(8,10);
+  const ultimoDia = new Date(+mes.slice(0,4), +mes.slice(5,7), 0).getDate();
+  const nuevo = { ...g, id: uid(), fecha: mes + '-' + String(Math.min(+dia, ultimoDia)).padStart(2,'0'), importe: round2(imp), hasta: g.hasta || '', sigueDe: g.sigueDe || g.id };
+  g.hasta = mesMas(mes, -1);
+  state.gastos.push(nuevo);
+  state.editingGastoId = null;
+  await saveGastos();
+  showToast(`Cuota cambiada a €${fmt(nuevo.importe)} desde ${monthLabel(mes)}`);
   render();
 }
 
@@ -2223,7 +2291,7 @@ function renderMensualTab(c){
   const mes = state.mesActual || monthKey(todayISO());
   const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
   const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
-  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
+  const gastosFijosMes = gastosFijosDeMes(mes);
 
   const fechasUnicas = new Set();
   const totals = cierresMes.reduce((acc, d) => {
@@ -2362,10 +2430,7 @@ function renderAnualTab(c){
     (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
   Object.keys(fechasPorMes).forEach(k => { ensure(k).dias = fechasPorMes[k].size; });
-  state.gastos.filter(g => g.tipo === 'periodico').forEach(g => {
-    const k = monthKey(g.fecha);
-    ensure(k).gastosFijos += (+g.importe || 0);
-  });
+  sumarGastosFijosPorMes(ensure);
   todosLosServicios().filter(s => s.estado !== 'anulado').forEach(s => {
     const k = monthKey(s.fecha);
     ensure(k).servicios += 1;
@@ -2648,7 +2713,7 @@ function quitarFiltroHistorial(){
 function totalesMes(mes){
   const cierresMes = state.cierres.filter(d => monthKey(d.fecha) === mes).sort((a,b)=> a.fecha.localeCompare(b.fecha));
   const serviciosMes = serviciosDeMes(mes).filter(s => s.estado !== 'anulado');
-  const gastosFijosMes = state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha) === mes);
+  const gastosFijosMes = gastosFijosDeMes(mes);
   const fechasUnicas = new Set();
   const totals = cierresMes.reduce((acc, d) => {
     const calc = cierreCalc(d);
@@ -2734,9 +2799,7 @@ function totalesAnio(year){
     (fechasPorMes[k] || (fechasPorMes[k] = new Set())).add(d.fecha);
   });
   Object.keys(fechasPorMes).forEach(k => { ensure(k).dias = fechasPorMes[k].size; });
-  state.gastos.filter(g => g.tipo === 'periodico' && monthKey(g.fecha).startsWith(year)).forEach(g => {
-    ensure(monthKey(g.fecha)).gastosFijos += (+g.importe || 0);
-  });
+  sumarGastosFijosPorMes(ensure, year);
   todosLosServicios().filter(s => s.estado !== 'anulado' && monthKey(s.fecha).startsWith(year)).forEach(s => {
     ensure(monthKey(s.fecha)).servicios += 1;
   });

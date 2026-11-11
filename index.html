@@ -3103,14 +3103,15 @@ window.mcApplyBackup = applyBackupPayload;
 window.mcDatosCargados = () => !!state.loaded;
 window.mcEnAjustes = () => state.tab === 'ajustes';
 window.mcResumen = () => {
-  const r = { cierres: state.cierres.length, servicios: state.servicios.length, gastos: state.gastos.length, mant: state.mantenimientos.length };
-  r.total = r.cierres + r.servicios + r.gastos + r.mant;
+  const r = { cierres: state.cierres.length, servicios: todosLosServicios().length, sinCerrar: state.servicios.length, gastos: state.gastos.length, mant: state.mantenimientos.length };
+  r.total = r.cierres + r.sinCerrar + r.gastos + r.mant;
   return r;
 };
 function mcEsc(t){ return String(t==null?'':t).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 function nubeTexto(c){
   if(!c || !c.resumen) return '';
-  return c.fecha.split('-').reverse().join('/') + (c.hora ? ' a las ' + c.hora : '') + ' · ' + c.resumen.cierres + ' cierres, ' + c.resumen.servicios + ' servicios, ' + c.resumen.gastos + ' gastos';
+  const r = c.resumen;
+  return c.fecha.split('-').reverse().join('/') + (c.hora ? ' a las ' + c.hora : '') + ' · ' + r.cierres + ' cierres, ' + r.servicios + ' servicios' + (r.sinCerrar != null ? ' (' + r.sinCerrar + ' sin cerrar)' : '') + ', ' + r.gastos + ' gastos' + (r.mant != null ? ', ' + r.mant + ' mantenimientos' : '');
 }
 function renderNubeCard(){
   const n = window.mcNubeInfo;
